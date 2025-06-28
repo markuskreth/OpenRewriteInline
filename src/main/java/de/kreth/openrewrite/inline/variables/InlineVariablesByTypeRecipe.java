@@ -42,7 +42,7 @@ public class InlineVariablesByTypeRecipe extends Recipe {
 
 	@Override
 	public @Description String getDescription() {
-		return getDisplayName();
+		return getDisplayName() + ".";
 	}
 
 	@Override
