@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
@@ -16,7 +18,10 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.TypeMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.J.Block;
+import org.openrewrite.java.tree.J.MethodInvocation;
 import org.openrewrite.java.tree.J.VariableDeclarations;
+import org.openrewrite.java.tree.J.VariableDeclarations.NamedVariable;
 import org.openrewrite.java.tree.Statement;
 
 import lombok.With;
@@ -82,8 +87,7 @@ public class InlineVariablesByTypeRecipe extends Recipe {
 			}
 
 			// Transformiere nur wenn sicher
-			transformBlock(block, inlineableVars, ctx);
-			return block;
+			return transformBlock(block, inlineableVars, ctx);
 		}
 
 		private void analyzeVariableDeclaration(J.VariableDeclarations varDecl,
@@ -127,43 +131,76 @@ public class InlineVariablesByTypeRecipe extends Recipe {
 			return true;
 		}
 
-		private void transformBlock(J.Block block, Map<String, VariableInfo> inlineableVars, ExecutionContext ctx) {
-			new InlineVariableReplacer(inlineableVars).visit(block, ctx);
+		static List<Statement> getBlockStatemets(J.Block block) {
+			return new BlockToRecursiveStatementsVisitor().reduce(block, new ArrayList<Statement>());
+		}
+
+		private Block transformBlock(J.Block block, Map<String, VariableInfo> inlineableVars, ExecutionContext ctx) {
+
+			@Nullable
+			J newBlock = new InlineVariableReplacer(inlineableVars, targetTypeMatcher, factoryMethodName).visit(block, ctx);
+
+			if (newBlock instanceof J.Block b) {
+				return b;
+			}
+			throw new IllegalStateException("Transformation result is not a block: " + newBlock.getClass().getSimpleName());
 		}
 
 	}
 
-	static List<Statement> getBlockStatemets(J.Block block) {
-		return new BlockToRecursiveStatementsVisitor().reduce(block, new ArrayList<Statement>());
-	}
-
-	// Innere Klasse für die Ersetzung von Variablenverwendungen
-	private class InlineVariableReplacer extends JavaIsoVisitor<ExecutionContext> {
+	/**
+	 * Variablen-Aufrufe werden ersetzt durch Erzeuger-Methodenaufruf. Die Variablen-Deklaration wird entfernt.
+	 */
+	private static class InlineVariableReplacer extends JavaIsoVisitor<ExecutionContext> {
 		private final Map<String, VariableInfo> inlineableVars;
 		private final TypeMatcher targetTypeMatcher;
+		private String factoryMethodName;
 
-		public InlineVariableReplacer(Map<String, VariableInfo> inlineableVars) {
+		public InlineVariableReplacer(Map<String, VariableInfo> inlineableVars, TypeMatcher targetTypeMatcher, String factoryMethodName) {
 			this.inlineableVars = inlineableVars;
-			this.targetTypeMatcher = new TypeMatcher(targetType);
+			this.targetTypeMatcher = targetTypeMatcher;
+			this.factoryMethodName = factoryMethodName;
 		}
 
 		@Override
-		public Expression visitExpression(Expression expression, ExecutionContext ctx) {
-			if (expression instanceof J.Identifier identifier) {
-				String varName = identifier.getSimpleName();
-				@Nullable
-				VariableDeclarations correspondingVariableDeclaration = getCursor().firstEnclosing(J.VariableDeclarations.class);
-				
-				if (correspondingVariableDeclaration != null && !targetTypeMatcher.matches(correspondingVariableDeclaration.getType()) && inlineableVars.containsKey(varName)) {
-					VariableInfo varInfo = inlineableVars.get(varName);
-
-					// Erstelle eine Kopie des Method-Aufrufs für die Inline-Ersetzung
-					return varInfo.initialization.withId(Tree.randomId()).withPrefix(identifier.getPrefix());
-				}
+		public VariableDeclarations visitVariableDeclarations(VariableDeclarations multiVariable, ExecutionContext p) {
+			// Erzeugung der Variablen, die inlineable sind, entfernen.
+			VariableDeclarations visitVariableDeclarations = super.visitVariableDeclarations(multiVariable, p);
+			List<NamedVariable> variables = visitVariableDeclarations.getVariables();
+			for (NamedVariable namedVariable : variables) {
+				if (namedVariable.getInitializer() instanceof J.MethodInvocation mi) {
+					// Prüfe ob es der Factory-Methode entspricht
+					if (targetTypeMatcher.matches(mi.getType()) && factoryMethodName.equals(mi.getSimpleName())) {
+						return null;	// Wenn ja, diese Zeile entfernen.
+					}
+	               }
 			}
-
-			return super.visitExpression(expression, ctx);
+			return visitVariableDeclarations;
 		}
+		
+		@Override
+		public MethodInvocation visitMethodInvocation(MethodInvocation mi, ExecutionContext p) {
+			// ersetze inline Variable mit erzeuger Methodenaufruf.
+			MethodInvocation visitMethodInvocation = super.visitMethodInvocation(mi, p);
+
+			AtomicReference<String> varName = new AtomicReference<>(mi.getSimpleName());
+			Optional.ofNullable(mi.getSelect()).ifPresent(select -> {
+				if (select instanceof J.Identifier identifier) {
+					varName.set(identifier.getSimpleName());
+				}
+			});
+			if (inlineableVars.containsKey(varName.get())) {
+				VariableInfo varInfo = inlineableVars.get(varName.get());
+				// Erstelle eine Kopie des Method-Aufrufs für die Inline-Ersetzung
+				MethodInvocation replacement = varInfo.initialization
+						.withId(Tree.randomId())
+						.withPrefix(mi.getSelect().getPrefix());
+				// Ersetze den Select-Teil, mit replacement
+				return mi.withSelect(replacement);
+			}
+			return visitMethodInvocation;
+		}
+		
 	}
 
 }
