@@ -2,11 +2,10 @@ package de.kreth.openrewrite.inline.variables;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.NlsRewrite.Description;
 import org.openrewrite.Option;
@@ -60,8 +59,6 @@ public class InlineVariablesByTypeRecipe extends Recipe {
 		private final TypeMatcher targetTypeMatcher;
 		private final String factoryMethodName;
 
-		private final Map<String, VariableInfo> inlineableVars = new HashMap<>();
-
 		public InlineSpecificTypeVisitor(String targetType, String factoryMethodName) {
 			this.targetTypeMatcher = new TypeMatcher(targetType);
 			this.factoryMethodName = factoryMethodName;
@@ -69,6 +66,8 @@ public class InlineVariablesByTypeRecipe extends Recipe {
 
 		@Override
 		public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
+
+			final Map<String, VariableInfo> inlineableVars = new HashMap<>();
 
 			// Sammle nur Variablen des exakten Typs
 			List<Statement> blockStatemets = getBlockStatemets(block);
@@ -83,34 +82,27 @@ public class InlineVariablesByTypeRecipe extends Recipe {
 			}
 
 			// Transformiere nur wenn sicher
-			return transformBlock(block, inlineableVars, blockStatemets, ctx);
-		}
-
-		@Override
-		public VariableDeclarations visitVariableDeclarations(VariableDeclarations multiVariable, ExecutionContext p) {
-			VariableDeclarations variableDeclarations = super.visitVariableDeclarations(multiVariable, p);
-			analyzeVariableDeclaration(variableDeclarations, inlineableVars, p);
-
-			return variableDeclarations;
+			transformBlock(block, inlineableVars, ctx);
+			return block;
 		}
 
 		private void analyzeVariableDeclaration(J.VariableDeclarations varDecl,
-				Map<String, VariableInfo> inlineableVars, ExecutionContext ctx) {
+				Map<String, VariableInfo> inlineableVars,
+				ExecutionContext ctx) {
 
 			// Exakte Typprüfung über OpenRewrite's Typsystem
 			if (!targetTypeMatcher.matches(varDecl.getType())) {
-				return;
-			}
+				return; // Nicht der erwartete Typ
+			} else {
+				for (J.VariableDeclarations.NamedVariable var : varDecl.getVariables()) {
+					Expression initializer = var.getInitializer();
 
-			for (J.VariableDeclarations.NamedVariable var : varDecl.getVariables()) {
-				Expression initializer = var.getInitializer();
+					if (initializer instanceof J.MethodInvocation init) {
 
-				if (initializer instanceof J.MethodInvocation init) {
-
-					// Prüfe ob es der erwartete Factory-Method ist
-					if (factoryMethodName.equals(init.getSimpleName()) && isInlineableMethodCall(init, ctx)) {
-
-						inlineableVars.put(var.getSimpleName(), new VariableInfo(var, init, varDecl));
+						// Prüfe ob es der erwartete Factory-Method ist
+						if (factoryMethodName.equals(init.getSimpleName()) && isInlineableMethodCall(init, ctx)) {
+							inlineableVars.put(var.getSimpleName(), new VariableInfo(var, init, varDecl));
+						}
 					}
 				}
 			}
@@ -135,55 +127,8 @@ public class InlineVariablesByTypeRecipe extends Recipe {
 			return true;
 		}
 
-		private J.Block transformBlock(J.Block block, Map<String, VariableInfo> inlineableVars, List<Statement> blockStatemets, ExecutionContext ctx) {
-			List<Statement> newStatements = new ArrayList<>();
-			Set<String> variablesToRemove = new HashSet<>();
-
-			for (Statement stmt : blockStatemets) {
-				if (stmt instanceof J.VariableDeclarations varDecl) {
-					J.VariableDeclarations transformedDecl = removeInlineableVariables(varDecl, inlineableVars,
-							variablesToRemove);
-
-					// Nur hinzufügen wenn noch Variablen übrig sind
-					if (transformedDecl != null && !transformedDecl.getVariables().isEmpty()) {
-						newStatements.add(transformedDecl);
-					}
-				} else {
-					// Andere Statements: Inline-Ersetzungen durchführen
-					Statement transformedStmt = inlineVariableUsages(stmt, inlineableVars, ctx);
-					newStatements.add(transformedStmt);
-				}
-			}
-
-			return block.withStatements(newStatements);
-		}
-
-		private J.VariableDeclarations removeInlineableVariables(J.VariableDeclarations varDecl,
-				Map<String, VariableInfo> inlineableVars, Set<String> variablesToRemove) {
-
-			List<J.VariableDeclarations.NamedVariable> remainingVars = new ArrayList<>();
-
-			for (J.VariableDeclarations.NamedVariable var : varDecl.getVariables()) {
-				String varName = var.getSimpleName();
-
-				if (inlineableVars.containsKey(varName)) {
-					variablesToRemove.add(varName);
-					// Diese Variable wird nicht zur neuen Liste hinzugefügt (= entfernt)
-				} else {
-					remainingVars.add(var);
-				}
-			}
-
-			if (remainingVars.isEmpty()) {
-				return null; // Gesamte Deklaration entfernen
-			}
-
-			return varDecl.withVariables(remainingVars);
-		}
-
-		private Statement inlineVariableUsages(Statement stmt, Map<String, VariableInfo> inlineableVars,
-				ExecutionContext ctx) {
-			return (Statement) new InlineVariableReplacer(inlineableVars).visit(stmt, ctx);
+		private void transformBlock(J.Block block, Map<String, VariableInfo> inlineableVars, ExecutionContext ctx) {
+			new InlineVariableReplacer(inlineableVars).visit(block, ctx);
 		}
 
 	}
@@ -191,25 +136,29 @@ public class InlineVariablesByTypeRecipe extends Recipe {
 	static List<Statement> getBlockStatemets(J.Block block) {
 		return new BlockToRecursiveStatementsVisitor().reduce(block, new ArrayList<Statement>());
 	}
-	
+
 	// Innere Klasse für die Ersetzung von Variablenverwendungen
-	private static class InlineVariableReplacer extends JavaIsoVisitor<ExecutionContext> {
+	private class InlineVariableReplacer extends JavaIsoVisitor<ExecutionContext> {
 		private final Map<String, VariableInfo> inlineableVars;
+		private final TypeMatcher targetTypeMatcher;
 
 		public InlineVariableReplacer(Map<String, VariableInfo> inlineableVars) {
 			this.inlineableVars = inlineableVars;
+			this.targetTypeMatcher = new TypeMatcher(targetType);
 		}
 
 		@Override
 		public Expression visitExpression(Expression expression, ExecutionContext ctx) {
 			if (expression instanceof J.Identifier identifier) {
 				String varName = identifier.getSimpleName();
-
-				if (inlineableVars.containsKey(varName)) {
+				@Nullable
+				VariableDeclarations correspondingVariableDeclaration = getCursor().firstEnclosing(J.VariableDeclarations.class);
+				
+				if (correspondingVariableDeclaration != null && !targetTypeMatcher.matches(correspondingVariableDeclaration.getType()) && inlineableVars.containsKey(varName)) {
 					VariableInfo varInfo = inlineableVars.get(varName);
 
 					// Erstelle eine Kopie des Method-Aufrufs für die Inline-Ersetzung
-					return varInfo.initialization.withId(Tree.randomId());
+					return varInfo.initialization.withId(Tree.randomId()).withPrefix(identifier.getPrefix());
 				}
 			}
 
