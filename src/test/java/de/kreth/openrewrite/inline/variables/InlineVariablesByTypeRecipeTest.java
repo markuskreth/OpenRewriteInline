@@ -8,6 +8,8 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
+import org.eclipse.core.runtime.Platform;
+
 class InlineVariablesByTypeRecipeTest implements RewriteTest {
 
     @Override
@@ -15,7 +17,16 @@ class InlineVariablesByTypeRecipeTest implements RewriteTest {
         spec.recipe(new InlineVariablesByTypeRecipe()
             .withTargetType("org.eclipse.core.runtime.IExtensionRegistry")
             .withFactoryMethodName("getExtensionRegistry"))
-            .parser(JavaParser.fromJavaVersion().classpath("org.eclipse.platform:org.eclipse.core.runtime:3.33.100"));
+            .parser(JavaParser.fromJavaVersion().classpath(
+                    "org.eclipse.core.runtime",
+                    "org.eclipse.osgi",
+                    "org.eclipse.equinox.common",
+                    "org.eclipse.core.jobs",
+                    "org.eclipse.equinox.registry",
+                    "org.eclipse.equinox.preferences",
+                    "org.eclipse.core.contenttype",
+                    "org.eclipse.equinox.app"
+                ));
     }
 
     @Test
@@ -92,7 +103,7 @@ class InlineVariablesByTypeRecipeTest implements RewriteTest {
                         IExtensionPoint point = registry.getExtensionPoint("my.extension");
                     }
                    
-                    Platform someComplexMethod() { return Platform.getDefault(); }
+                    Platform someComplexMethod() { return null; }
                 }
                 """
             )
@@ -128,7 +139,7 @@ class InlineVariablesByTypeRecipeTest implements RewriteTest {
                
                 class MyClass {
                     void method() {
-                        IExtensionRegistry registry = Platform.createExtensionRegistry();
+                        IExtensionRegistry registry = Platform.getAdapterManager();
                         IExtensionPoint point = registry.getExtensionPoint("my.extension");
                     }
                 }
