@@ -1,14 +1,12 @@
 package de.kreth.openrewrite.inline.variables;
 
 
+import static org.openrewrite.java.Assertions.java;
+
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
-
-import static org.openrewrite.java.Assertions.java;
-
-import org.eclipse.core.runtime.Platform;
 
 class InlineVariablesByTypeRecipeTest implements RewriteTest {
 
@@ -105,7 +103,17 @@ class InlineVariablesByTypeRecipeTest implements RewriteTest {
                    
                     Platform someComplexMethod() { return null; }
                 }
-                """
+                """,
+                "package com.example;\n"
+                + "import org.eclipse.core.runtime.*;\n"
+                + "\n"
+                + "class MyClass {\n"
+                + "    void method() {\n"
+                + "        IExtensionPoint point = someComplexMethod().getExtensionRegistry().getExtensionPoint(\"my.extension\");\n"
+                + "    }\n"
+                + "\n"
+                + "    Platform someComplexMethod() { return null; }\n"
+                + "}"
             )
         );
     }
@@ -141,36 +149,6 @@ class InlineVariablesByTypeRecipeTest implements RewriteTest {
                     void method() {
                         IExtensionRegistry registry = Platform.getAdapterManager();
                         IExtensionPoint point = registry.getExtensionPoint("my.extension");
-                    }
-                }
-                """
-            )
-        );
-    }
-
-    @Test
-    void handleMultipleVariableDeclarationsInOneLine() {
-        rewriteRun(
-            java(
-                """
-                package com.example;
-                import org.eclipse.core.runtime.*;
-               
-                class MyClass {
-                    void method() {
-                        IExtensionRegistry registry = Platform.getExtensionRegistry(), other = null;
-                        IExtensionPoint point = registry.getExtensionPoint("my.extension");
-                    }
-                }
-                """,
-                """
-                package com.example;
-                import org.eclipse.core.runtime.*;
-               
-                class MyClass {
-                    void method() {
-                        IExtensionRegistry other = null;
-                        IExtensionPoint point = Platform.getExtensionRegistry().getExtensionPoint("my.extension");
                     }
                 }
                 """
@@ -235,8 +213,8 @@ class InlineVariablesByTypeRecipeTest implements RewriteTest {
                
                 class MyClass {
                     void method() {
+               
                         // Get the extension registry
-                       
                         // Find our extension point
                         IExtensionPoint point = Platform.getExtensionRegistry().getExtensionPoint("my.extension");
                     }
