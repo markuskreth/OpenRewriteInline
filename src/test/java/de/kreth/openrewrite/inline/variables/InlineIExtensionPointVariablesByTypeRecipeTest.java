@@ -378,26 +378,46 @@ class InlineIExtensionPointVariablesByTypeRecipeTest implements RewriteTest {
     void inlineExtensionPointInConditionalLogicAfterRegistryInlined() {
         rewriteRun(
             java(
-                """
-                package com.example;
-                import org.eclipse.core.runtime.*;
-               
-                class MyClass {
-                    void method() {
-                        IExtensionPoint point = Platform.getExtensionRegistry().getExtensionPoint("my.extension");
-                        
-                        if (point != null) {
-                            IExtension[] extensions = point.getExtensions();
-                            if (extensions.length > 0) {
-                                IConfigurationElement[] elements = point.getConfigurationElements();
-                                processElements(elements);
+                    """
+                    package com.example;
+                    import org.eclipse.core.runtime.*;
+                   
+                    class MyClass {
+                        void method() {
+                            IExtensionPoint point = Platform.getExtensionRegistry().getExtensionPoint("my.extension");
+                            
+                            if (point != null) {
+                                IExtension[] extensions = point.getExtensions();
+                                if (extensions.length > 0) {
+                                    IConfigurationElement[] elements = point.getConfigurationElements();
+                                    processElements(elements);
+                                }
                             }
                         }
+                        
+                        void processElements(IConfigurationElement[] elements) {}
                     }
-                    
-                    void processElements(IConfigurationElement[] elements) {}
-                }
-                """
+                    """, 
+                    """
+                    package com.example;
+                    import org.eclipse.core.runtime.*;
+                   
+                    class MyClass {
+                        void method() {
+                            IExtensionPoint point = Platform.getExtensionRegistry().getExtensionPoint("my.extension");
+                            
+                            if (/*~~(Illegal variable usage in if condition)~~>*/point != null) {
+                                IExtension[] extensions = point.getExtensions();
+                                if (extensions.length > 0) {
+                                    IConfigurationElement[] elements = point.getConfigurationElements();
+                                    processElements(elements);
+                                }
+                            }
+                        }
+                        
+                        void processElements(IConfigurationElement[] elements) {}
+                    }
+                    """
             )
         );
     }

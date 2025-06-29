@@ -55,6 +55,7 @@ public class InlineVariablesByTypeRecipe extends Recipe {
 
 	@Override
 	public TreeVisitor<?, ExecutionContext> getVisitor() {
+		
 		return new InlineSpecificTypeVisitor(targetType, factoryMethodName);
 	}
 
@@ -90,8 +91,8 @@ public class InlineVariablesByTypeRecipe extends Recipe {
 
 			List<VariableUsage> illegalUsages = VariableInfoIllegalUsageFinder.findIllegalUsages(block, inlineableVars.get());
 			if (!illegalUsages.isEmpty()) {
-				// Wenn es illegale Verwendungen gibt, nicht inlineable
-				return block;
+				// Wenn es illegale Verwendungen gibt, markieren
+				return VariableUsageMarker.markIllegalUsages(block, illegalUsages);
 			}
 			
 			// Transformiere nur wenn sicher

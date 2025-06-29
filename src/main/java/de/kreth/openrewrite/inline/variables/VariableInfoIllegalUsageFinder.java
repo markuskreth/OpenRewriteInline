@@ -35,7 +35,6 @@ public class VariableInfoIllegalUsageFinder extends JavaIsoVisitor<List<Variable
 						.variableInfo(variableInfo)
 						.expression(condition)
 						.usageType(VariableUsage.UsageType.IF_CONDITION).build());
-				p.add(VariableUsage.builder().build());
 			}
 			return visitIf;
 		}

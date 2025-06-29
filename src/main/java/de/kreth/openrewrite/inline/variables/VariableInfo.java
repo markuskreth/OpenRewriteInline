@@ -28,6 +28,10 @@ public class VariableInfo {
 		return variable.toString();
     }
 
+	public String getSimpleName() {
+		return variableName;
+	}
+	
 	public boolean isMatch(Expression expression) {
 		if (expression instanceof J.Identifier ident) {
 			return variableName.equals(ident.getSimpleName()) 
