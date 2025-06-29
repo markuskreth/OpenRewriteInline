@@ -8,7 +8,7 @@ import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-class InlineVariablesByTypeRecipeTest implements RewriteTest {
+class InlineIExtensionRegistryVariablesByTypeRecipeTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {

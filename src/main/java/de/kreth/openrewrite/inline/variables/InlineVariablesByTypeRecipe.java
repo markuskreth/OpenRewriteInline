@@ -2,7 +2,6 @@ package de.kreth.openrewrite.inline.variables;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.jspecify.annotations.Nullable;
@@ -79,12 +78,22 @@ public class InlineVariablesByTypeRecipe extends Recipe {
 				if (stmt instanceof J.VariableDeclarations varDecl) {
 					analyzeVariableDeclaration(varDecl, inlineableVars, ctx);
 				}
+				if (inlineableVars.get() != null) {
+					// Wenn bereits eine inlineable Variable gefunden wurde, abbrechen
+					break;
+				}
 			}
 
 			if (inlineableVars.get() == null) {
 				return block;
 			}
 
+			List<VariableUsage> illegalUsages = VariableInfoIllegalUsageFinder.findIllegalUsages(block, inlineableVars.get());
+			if (!illegalUsages.isEmpty()) {
+				// Wenn es illegale Verwendungen gibt, nicht inlineable
+				return block;
+			}
+			
 			// Transformiere nur wenn sicher
 			return transformBlock(block, inlineableVars.get(), ctx);
 		}
@@ -104,6 +113,7 @@ public class InlineVariablesByTypeRecipe extends Recipe {
 						// Prüfe ob es der erwartete Factory-Method ist
 						if (factoryMethodName.equals(init.getSimpleName()) && isInlineableMethodCall(init, ctx)) {
 							inlineableVars.set(new VariableInfo(var.getSimpleName(), var, init, varDecl));
+							break;
 						}
 					}
 				}
@@ -155,7 +165,7 @@ public class InlineVariablesByTypeRecipe extends Recipe {
 	private static class InlineVariableReplacer extends JavaIsoVisitor<ExecutionContext> {
 		private final VariableInfo inlineableVars;
 		private final TypeMatcher targetTypeMatcher;
-		private String factoryMethodName;
+		private final String factoryMethodName;
 
 		public InlineVariableReplacer(VariableInfo inlineableVars, TypeMatcher targetTypeMatcher,
 				String factoryMethodName) {
@@ -171,10 +181,15 @@ public class InlineVariablesByTypeRecipe extends Recipe {
 			List<NamedVariable> variables = visitVariableDeclarations.getVariables();
 			for (NamedVariable namedVariable : variables) {
 				if (namedVariable.getInitializer() instanceof J.MethodInvocation mi) {
+					
 					// Prüfe ob es der Factory-Methode entspricht
-					if (targetTypeMatcher.matches(mi.getType()) && factoryMethodName.equals(mi.getSimpleName())) {
-						
-						return null; // Wenn ja, diese Zeile entfernen.
+					if (targetTypeMatcher.matches(mi.getType()) 
+							&& factoryMethodName.equals(mi.getSimpleName())) {
+						if (inlineableVars.isMatch(namedVariable)) {
+							return null; // Wenn ja, diese Zeile entfernen.
+						} else {
+							return visitVariableDeclarations;
+						}
 					} else {
 						@Nullable
 						Expression declarator = namedVariable.getInitializer();
@@ -205,13 +220,7 @@ public class InlineVariablesByTypeRecipe extends Recipe {
 			// ersetze inline Variable mit erzeuger Methodenaufruf.
 			MethodInvocation visitMethodInvocation = super.visitMethodInvocation(mi, p);
 
-			AtomicReference<String> varName = new AtomicReference<>(visitMethodInvocation.getSimpleName());
-			Optional.ofNullable(mi.getSelect()).ifPresent(select -> {
-				if (select instanceof J.Identifier identifier) {
-					varName.set(identifier.getSimpleName());
-				}
-			});
-			if (inlineableVars.variableName.equals(varName.get())) {
+			if (inlineableVars.isMatch(visitMethodInvocation.getSelect())) {
 				// Erstelle eine Kopie des Method-Aufrufs für die Inline-Ersetzung
 				MethodInvocation replacement = inlineableVars.initialization.withId(Tree.randomId())
 						.withPrefix(visitMethodInvocation.getSelect().getPrefix());
