@@ -3,6 +3,7 @@ package de.kreth.openrewrite.inline.variables;
 import java.util.ArrayList;
 import java.util.List;
 
+
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -17,7 +18,7 @@ public class VariableInfoIllegalUsageFinder extends JavaIsoVisitor<List<Variable
 		VariableInfoIllegalUsageFinder finder = new VariableInfoIllegalUsageFinder(variableInfo);
 		return finder.reduce(block, new ArrayList<>());
 	}
-	
+
 	private VariableInfoIllegalUsageFinder(VariableInfo variableInfo) {
 		super();
 		this.variableInfo = variableInfo;
@@ -29,7 +30,7 @@ public class VariableInfoIllegalUsageFinder extends JavaIsoVisitor<List<Variable
 		Expression condition = visitIf.getIfCondition().getTree();
 		if (condition instanceof J.Binary binary) {
 			Expression nonNullExpression = getNonNullExpression(binary.getLeft(), binary.getRight());
-			
+
 			if (variableInfo.isMatch(nonNullExpression)) {
 				p.add(VariableUsage.builder()
 						.variableInfo(variableInfo)

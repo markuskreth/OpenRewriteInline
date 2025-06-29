@@ -3,7 +3,9 @@ package de.kreth.openrewrite.inline.variables;
 
 import static org.openrewrite.java.Assertions.java;
 
+
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -27,11 +29,12 @@ class InlineIExtensionRegistryVariablesByTypeRecipeTest implements RewriteTest {
                 ));
     }
 
-    @Test
-    void inlineSimpleVariableUsage() {
+	@DocumentExample
+	@Test
+	void inlineSimpleVariableUsage() {
         rewriteRun(
             java(
-                """
+				"""
                 package com.example;
                 import org.eclipse.core.runtime.*;
                
@@ -42,7 +45,7 @@ class InlineIExtensionRegistryVariablesByTypeRecipeTest implements RewriteTest {
                     }
                 }
                 """,
-                """
+				"""
                 package com.example;
                 import org.eclipse.core.runtime.*;
                
@@ -60,7 +63,7 @@ class InlineIExtensionRegistryVariablesByTypeRecipeTest implements RewriteTest {
     void inlineMultipleUsagesOfSameVariable() {
         rewriteRun(
             java(
-                """
+				"""
                 package com.example;
                 import org.eclipse.core.runtime.*;
                
@@ -72,7 +75,7 @@ class InlineIExtensionRegistryVariablesByTypeRecipeTest implements RewriteTest {
                     }
                 }
                 """,
-                """
+				"""
                 package com.example;
                 import org.eclipse.core.runtime.*;
                
@@ -91,7 +94,7 @@ class InlineIExtensionRegistryVariablesByTypeRecipeTest implements RewriteTest {
     void dontInlineVariableWithComplexInitializer() {
         rewriteRun(
             java(
-                """
+				"""
                 package com.example;
                 import org.eclipse.core.runtime.*;
                
@@ -104,16 +107,16 @@ class InlineIExtensionRegistryVariablesByTypeRecipeTest implements RewriteTest {
                     Platform someComplexMethod() { return null; }
                 }
                 """,
-                "package com.example;\n"
-                + "import org.eclipse.core.runtime.*;\n"
-                + "\n"
-                + "class MyClass {\n"
-                + "    void method() {\n"
-                + "        IExtensionPoint point = someComplexMethod().getExtensionRegistry().getExtensionPoint(\"my.extension\");\n"
-                + "    }\n"
-                + "\n"
-                + "    Platform someComplexMethod() { return null; }\n"
-                + "}"
+				"package com.example;\n" +
+						"import org.eclipse.core.runtime.*;\n" +
+						"\n" +
+						"class MyClass {\n" +
+						"    void method() {\n" +
+						"        IExtensionPoint point = someComplexMethod().getExtensionRegistry().getExtensionPoint(\"my.extension\");\n" +
+						"    }\n" +
+						"\n" +
+						"    Platform someComplexMethod() { return null; }\n" +
+						"}"
             )
         );
     }
@@ -122,7 +125,7 @@ class InlineIExtensionRegistryVariablesByTypeRecipeTest implements RewriteTest {
     void dontInlineWrongType() {
         rewriteRun(
             java(
-                """
+				"""
                 package com.example;
                 import org.eclipse.core.runtime.*;
                
@@ -141,7 +144,7 @@ class InlineIExtensionRegistryVariablesByTypeRecipeTest implements RewriteTest {
     void dontInlineWrongMethodName() {
         rewriteRun(
             java(
-                """
+				"""
                 package com.example;
                 import org.eclipse.core.runtime.*;
                
@@ -160,7 +163,7 @@ class InlineIExtensionRegistryVariablesByTypeRecipeTest implements RewriteTest {
     void inlineChainedMethodCalls() {
         rewriteRun(
             java(
-                """
+				"""
                 package com.example;
                 import org.eclipse.core.runtime.*;
                
@@ -173,7 +176,7 @@ class InlineIExtensionRegistryVariablesByTypeRecipeTest implements RewriteTest {
                     }
                 }
                 """,
-                """
+				"""
                 package com.example;
                 import org.eclipse.core.runtime.*;
                
@@ -193,7 +196,7 @@ class InlineIExtensionRegistryVariablesByTypeRecipeTest implements RewriteTest {
     void preserveCommentsAndFormatting() {
         rewriteRun(
             java(
-                """
+				"""
                 package com.example;
                 import org.eclipse.core.runtime.*;
                
@@ -207,7 +210,7 @@ class InlineIExtensionRegistryVariablesByTypeRecipeTest implements RewriteTest {
                     }
                 }
                 """,
-                """
+				"""
                 package com.example;
                 import org.eclipse.core.runtime.*;
                

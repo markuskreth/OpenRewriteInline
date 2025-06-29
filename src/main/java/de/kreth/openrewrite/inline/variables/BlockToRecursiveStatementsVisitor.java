@@ -2,6 +2,7 @@ package de.kreth.openrewrite.inline.variables;
 
 import java.util.List;
 
+
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Statement;
 

@@ -4,9 +4,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
+
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.NlsRewrite.Description;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.Tree;
@@ -26,12 +26,16 @@ import lombok.With;
 
 public class InlineVariablesByTypeRecipe extends Recipe {
 
-	@Option(displayName = "Target Type", description = "Fully qualified class name to inline")
 	@With
+	@Option(example = 
+			"org.eclipse.core.runtime.IExtensionPoint, "
+			+ "org.eclipse.core.runtime.IExtensionRegistry"
+			, displayName = "Target Type", description = "Fully qualified class name to inline")
 	String targetType;
 
-	@Option(displayName = "Factory Method Name", description = "Method name that creates this type")
 	@With
+	@Option(example = "getExtensionPoint, getExtensionRegistry"
+			, displayName = "Factory Method Name", description = "Method name that creates this type")
 	String factoryMethodName;
 
 	public InlineVariablesByTypeRecipe(String targetType, String factoryMethodName) {
@@ -49,13 +53,13 @@ public class InlineVariablesByTypeRecipe extends Recipe {
 	}
 
 	@Override
-	public @Description String getDescription() {
+	public String getDescription() {
 		return getDisplayName() + ".";
 	}
 
 	@Override
 	public TreeVisitor<?, ExecutionContext> getVisitor() {
-		
+
 		return new InlineSpecificTypeVisitor(targetType, factoryMethodName);
 	}
 
@@ -94,7 +98,7 @@ public class InlineVariablesByTypeRecipe extends Recipe {
 				// Wenn es illegale Verwendungen gibt, markieren
 				return VariableUsageMarker.markIllegalUsages(block, illegalUsages);
 			}
-			
+
 			// Transformiere nur wenn sicher
 			return transformBlock(block, inlineableVars.get(), ctx);
 		}
@@ -175,17 +179,18 @@ public class InlineVariablesByTypeRecipe extends Recipe {
 			this.factoryMethodName = factoryMethodName;
 		}
 
+
 		@Override
-		public VariableDeclarations visitVariableDeclarations(VariableDeclarations multiVariable, ExecutionContext p) {
+		public @Nullable VariableDeclarations visitVariableDeclarations(VariableDeclarations multiVariable, ExecutionContext ctx) {
 			// Erzeugung der Variablen, die inlineable sind, entfernen.
-			VariableDeclarations visitVariableDeclarations = super.visitVariableDeclarations(multiVariable, p);
+			VariableDeclarations visitVariableDeclarations = super.visitVariableDeclarations(multiVariable, ctx);
 			List<NamedVariable> variables = visitVariableDeclarations.getVariables();
 			for (NamedVariable namedVariable : variables) {
 				if (namedVariable.getInitializer() instanceof J.MethodInvocation mi) {
-					
+
 					// Prüfe ob es der Factory-Methode entspricht
-					if (targetTypeMatcher.matches(mi.getType()) 
-							&& factoryMethodName.equals(mi.getSimpleName())) {
+					if (targetTypeMatcher.matches(mi.getType()) &&
+							factoryMethodName.equals(mi.getSimpleName())) {
 						if (inlineableVars.isMatch(namedVariable)) {
 							return null; // Wenn ja, diese Zeile entfernen.
 						} else {
@@ -195,13 +200,13 @@ public class InlineVariablesByTypeRecipe extends Recipe {
 						@Nullable
 						Expression declarator = namedVariable.getInitializer();
 						if (declarator instanceof J.MethodInvocation methodInvocation) {
-							
+
 							@Nullable
 							Expression select = methodInvocation.getSelect();
-							if (targetTypeMatcher.matches(select.getType())
-									&& (select instanceof J.MethodInvocation creationMethod)
-									&& targetTypeMatcher.matches(creationMethod.getType()) 
-									&& factoryMethodName.equals(creationMethod.getSimpleName())) {
+							if (targetTypeMatcher.matches(select.getType()) &&
+									(select instanceof J.MethodInvocation creationMethod) &&
+									targetTypeMatcher.matches(creationMethod.getType()) &&
+									factoryMethodName.equals(creationMethod.getSimpleName())) {
 
 								List<Comment> commentsOld = new ArrayList<>(inlineableVars.declaration.getComments());
 								List<Comment> comments = new ArrayList<>(commentsOld);
@@ -217,9 +222,9 @@ public class InlineVariablesByTypeRecipe extends Recipe {
 		}
 
 		@Override
-		public MethodInvocation visitMethodInvocation(MethodInvocation mi, ExecutionContext p) {
+		public MethodInvocation visitMethodInvocation(MethodInvocation mi, ExecutionContext ctx) {
 			// ersetze inline Variable mit erzeuger Methodenaufruf.
-			MethodInvocation visitMethodInvocation = super.visitMethodInvocation(mi, p);
+			MethodInvocation visitMethodInvocation = super.visitMethodInvocation(mi, ctx);
 
 			if (inlineableVars.isMatch(visitMethodInvocation.getSelect())) {
 				// Erstelle eine Kopie des Method-Aufrufs für die Inline-Ersetzung

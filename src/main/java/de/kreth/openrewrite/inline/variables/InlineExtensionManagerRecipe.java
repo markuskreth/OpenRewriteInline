@@ -3,7 +3,7 @@ package de.kreth.openrewrite.inline.variables;
 import java.util.Arrays;
 import java.util.List;
 
-import org.openrewrite.NlsRewrite.Description;
+
 import org.openrewrite.Recipe;
 
 public class InlineExtensionManagerRecipe extends Recipe {
@@ -13,10 +13,10 @@ public class InlineExtensionManagerRecipe extends Recipe {
     }
 
 	@Override
-	public @Description String getDescription() {
+	public String getDescription() {
 		return getDisplayName();
 	}
-	
+
     @Override
     public List<Recipe> getRecipeList() {
         return Arrays.asList(
@@ -24,15 +24,15 @@ public class InlineExtensionManagerRecipe extends Recipe {
                 new InlineVariablesByTypeRecipe()
                     .withTargetType("org.eclipse.core.runtime.IExtensionRegistry")
                     .withFactoryMethodName("getExtensionRegistry"),
-                   
+
                 new InlineVariablesByTypeRecipe()
                     .withTargetType("org.eclipse.core.runtime.IExtensionPoint")
                     .withFactoryMethodName("getExtensionPoint"),
-                   
+
                 new InlineVariablesByTypeRecipe()
                     .withTargetType("org.eclipse.core.runtime.IExtension")
                     .withFactoryMethodName("getExtension"),
-                   
+
                 // Auch für Arrays
                 new InlineVariablesByTypeRecipe()
                     .withTargetType("org.eclipse.core.runtime.IExtension[]")

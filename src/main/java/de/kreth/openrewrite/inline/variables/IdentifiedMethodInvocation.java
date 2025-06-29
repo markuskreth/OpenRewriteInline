@@ -13,5 +13,5 @@ public class IdentifiedMethodInvocation {
 
 	final J.Identifier identifier;
 	final J.MethodInvocation methodInvocation;
-	
+
 }
