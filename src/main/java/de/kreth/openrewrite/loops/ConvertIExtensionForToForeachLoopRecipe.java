@@ -17,10 +17,10 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.J.ArrayDimension;
+import org.openrewrite.java.tree.J.ForLoop;
 import org.openrewrite.java.tree.J.VariableDeclarations;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.JavaType.Variable;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeTree;
@@ -61,10 +61,10 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 
        class ConvertIExtensionForToForeachLoopVisitor extends JavaIsoVisitor<ExecutionContext> {
     	   
-            @Override
+			@Override
             public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
                 block = super.visitBlock(block, ctx);
-
+                
                 List<Statement> statements = block.getStatements();
                 for (int i = 0; i < statements.size(); i++) {
                     Statement stmt = statements.get(i);
@@ -81,21 +81,8 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
                     J.VariableDeclarations.NamedVariable indexVar = initVar.getVariables().get(0);
                     String indexName = indexVar.getSimpleName();
 
-                    // Schritt 2: Bedingung i < array.length
-                    Expression condition = forLoop.getControl().getCondition();
-                    if (!(condition instanceof J.Binary binary) || !binary.getOperator().equals(J.Binary.Type.LessThan)) {
-                        continue;
-                    }
-
-                    if (!(binary.getLeft() instanceof J.Identifier leftId) || !leftId.getSimpleName().equals(indexName)) {
-                        continue;
-                    }
-
-                    if (!(binary.getRight() instanceof J.FieldAccess fa) || !fa.getSimpleName().equals("length")) {
-                        continue;
-                    }
-
-                    if (!(fa.getTarget() instanceof J.Identifier arrayId)) {
+                    J.Identifier arrayId = getRightFieldIdentifier(forLoop, indexName);
+                    if (arrayId == null) {
 						continue;
 					}
                     String arrayName = arrayId.getSimpleName();
@@ -140,7 +127,6 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 						continue;
 					}
 
-                    J.Identifier typeId = indexedId.withSimpleName(className).withType(elemType);
                     J.Identifier varId = loopVar.getName();
 
                     List<Statement> newBodyStatements = forBody.getStatements().subList(1, forBody.getStatements().size());
@@ -193,6 +179,28 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 
                 return block;
             }
+
+			private J.Identifier getRightFieldIdentifier(ForLoop forLoop, String indexName) {
+                
+                // Schritt 2: Bedingung i < array.length
+                Expression condition = forLoop.getControl().getCondition();
+                if (!(condition instanceof J.Binary binary) || !binary.getOperator().equals(J.Binary.Type.LessThan)) {
+                	return null;
+                }
+
+                if (!(binary.getLeft() instanceof J.Identifier leftId) || !leftId.getSimpleName().equals(indexName)) {
+                	return null;
+                }
+
+                if (!(binary.getRight() instanceof J.FieldAccess fa) || !fa.getSimpleName().equals("length")) {
+                	return null;
+                }
+
+                if (!(fa.getTarget() instanceof J.Identifier arrayId)) {
+                	return null;
+				}
+            	return arrayId;
+			}
         
     }
 }
