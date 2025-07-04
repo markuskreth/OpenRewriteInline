@@ -156,8 +156,9 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
                             null 
                         );
 					
+					String simpleClassName = className.substring(className.lastIndexOf('.') + 1);
 					@Nullable
-					TypeTree varType = TypeTree.build(className);
+					TypeTree varType = TypeTree.build(simpleClassName);
 					
 					VariableDeclarations varDec = new VariableDeclarations(
 							Tree.randomId(), 
@@ -171,15 +172,15 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 							Arrays.asList(JRightPadded.build(var)));
 					
 					JRightPadded<VariableDeclarations> variable = JRightPadded.build(varDec).withAfter(Space.SINGLE_SPACE);
-					JRightPadded<Expression> iterable = JRightPadded.build(arrayId);
+					JRightPadded<Expression> iterable = JRightPadded.build(arrayId.withPrefix(Space.SINGLE_SPACE));
 					J.ForEachLoop.Control loopControll = new J.ForEachLoop.Control(Tree.randomId(), Space.SINGLE_SPACE, Markers.EMPTY, variable, iterable);
-					JRightPadded<Statement> tmp = new JRightPadded<>(newBody, Space.SINGLE_SPACE, Markers.EMPTY);
+					JRightPadded<Statement> body = new JRightPadded<>(newBody, Space.SINGLE_SPACE, Markers.EMPTY);
 					J.ForEachLoop foreach = new J.ForEachLoop(
 						    Tree.randomId(),
 						    forLoop.getPrefix(),
 						    Markers.EMPTY,
 						    loopControll,
-						    tmp 
+						    body 
 						);
                     // Neue Statementsliste mit foreach ersetzen
                     List<Statement> newStatements = List.copyOf(statements.subList(0, i));
