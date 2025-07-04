@@ -14,19 +14,16 @@ import org.openrewrite.Recipe;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.J.ArrayDimension;
 import org.openrewrite.java.tree.J.VariableDeclarations;
-import org.openrewrite.java.tree.J.VariableDeclarations.NamedVariable;
-import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.JRightPadded;
-import org.openrewrite.java.tree.JavaCoordinates;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.JavaType.Variable;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.marker.Markers;
 
 import lombok.AllArgsConstructor;
@@ -145,32 +142,38 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 
                     J.Identifier typeId = indexedId.withSimpleName(className).withType(elemType);
                     J.Identifier varId = loopVar.getName();
-                    J.Identifier arrId = arrayId;
 
                     List<Statement> newBodyStatements = forBody.getStatements().subList(1, forBody.getStatements().size());
                     J.Block newBody = forBody.withStatements(newBodyStatements);
 
-                    // Schritt 5: Template anwenden
-					VariableDeclarations varDec = new VariableDeclarations(
-								Tree.randomId(), 
-								Space.SINGLE_SPACE, 
-								Markers.EMPTY, 
-								Collections.emptyList(), 
-								Collections.emptyList(), typeId, Space.EMPTY, Collections.emptyList(), Collections.emptyList());
+					VariableDeclarations.NamedVariable var = new VariableDeclarations.NamedVariable(
+                            Tree.randomId(),
+                            Space.SINGLE_SPACE,
+                            Markers.EMPTY,
+                            varId.withId(Tree.randomId()),
+                            Collections.emptyList(),
+                            null,
+                            null 
+                        );
 					
 					@Nullable
-					JLeftPadded<Expression> init;
-					@Nullable
-					Variable type = loopVar.getVariableType();
-					JavaCoordinates coordinates = leftId.getCoordinates().replace();
-					NamedVariable namedVariable = JavaTemplate.apply(className + " " + varId, getCursor(), coordinates  );
-					List<NamedVariable> vars = Arrays.asList(namedVariable);
-					varDec = varDec.withVariables(vars);
+					TypeTree varType = TypeTree.build(className);
+					
+					VariableDeclarations varDec = new VariableDeclarations(
+							Tree.randomId(), 
+							Space.EMPTY, 
+							Markers.EMPTY, 
+							Collections.emptyList(), 
+							Collections.emptyList(), 
+							varType, 
+							null, 
+							Collections.emptyList(), 
+							Arrays.asList(JRightPadded.build(var)));
 					
 					JRightPadded<VariableDeclarations> variable = JRightPadded.build(varDec).withAfter(Space.SINGLE_SPACE);
-					JRightPadded<Expression> iterable = JRightPadded.build(arrId);
+					JRightPadded<Expression> iterable = JRightPadded.build(arrayId);
 					J.ForEachLoop.Control loopControll = new J.ForEachLoop.Control(Tree.randomId(), Space.SINGLE_SPACE, Markers.EMPTY, variable, iterable);
-					JRightPadded<Statement> tmp = new JRightPadded<Statement>(newBody, Space.SINGLE_SPACE, Markers.EMPTY);
+					JRightPadded<Statement> tmp = new JRightPadded<>(newBody, Space.SINGLE_SPACE, Markers.EMPTY);
 					J.ForEachLoop foreach = new J.ForEachLoop(
 						    Tree.randomId(),
 						    forLoop.getPrefix(),
