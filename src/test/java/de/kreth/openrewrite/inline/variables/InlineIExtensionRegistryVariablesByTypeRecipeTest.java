@@ -204,7 +204,7 @@ class InlineIExtensionRegistryVariablesByTypeRecipeTest implements RewriteTest {
                     void method() {
                         // Get the extension registry
                         IExtensionRegistry registry = Platform.getExtensionRegistry();
-                       
+                        
                         // Find our extension point
                         IExtensionPoint point = registry.getExtensionPoint("my.extension");
                     }
@@ -216,7 +216,7 @@ class InlineIExtensionRegistryVariablesByTypeRecipeTest implements RewriteTest {
                
                 class MyClass {
                     void method() {
-               
+                        
                         // Get the extension registry
                         // Find our extension point
                         IExtensionPoint point = Platform.getExtensionRegistry().getExtensionPoint("my.extension");

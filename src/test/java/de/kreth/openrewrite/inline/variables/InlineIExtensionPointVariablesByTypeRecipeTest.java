@@ -100,6 +100,7 @@ class InlineIExtensionPointVariablesByTypeRecipeTest implements RewriteTest {
                     void method() {
                         IExtensionPoint point = Platform.getExtensionRegistry().getExtensionPoint("my.extension");
                         IExtension[] extensions = point.getExtensions();
+                        
                         IConfigurationElement[] elements = point.getConfigurationElements();
                         System.out.println("Found " + extensions.length + " extensions");
                     }
@@ -112,6 +113,7 @@ class InlineIExtensionPointVariablesByTypeRecipeTest implements RewriteTest {
                 class MyClass {
                     void method() {
                         IExtension[] extensions = Platform.getExtensionRegistry().getExtensionPoint("my.extension").getExtensions();
+                        
                         IConfigurationElement[] elements = Platform.getExtensionRegistry().getExtensionPoint("my.extension").getConfigurationElements();
                         System.out.println("Found " + extensions.length + " extensions");
                     }

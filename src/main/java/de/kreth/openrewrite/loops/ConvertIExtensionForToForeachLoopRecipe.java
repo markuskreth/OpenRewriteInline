@@ -1,0 +1,194 @@
+package de.kreth.openrewrite.loops;
+
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Incubating;
+import org.openrewrite.NlsRewrite.Description;
+import org.openrewrite.NlsRewrite.DisplayName;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
+import org.openrewrite.Tree;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaTemplate;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.J.ArrayDimension;
+import org.openrewrite.java.tree.J.VariableDeclarations;
+import org.openrewrite.java.tree.J.VariableDeclarations.NamedVariable;
+import org.openrewrite.java.tree.JLeftPadded;
+import org.openrewrite.java.tree.JRightPadded;
+import org.openrewrite.java.tree.JavaCoordinates;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.JavaType.Variable;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.Statement;
+import org.openrewrite.marker.Markers;
+
+import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
+import lombok.With;
+
+@Incubating(since = "1.0.0")
+@EqualsAndHashCode(callSuper = true)
+@AllArgsConstructor
+@NoArgsConstructor
+public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
+
+	@Option(
+			displayName = "Verarbeiteter Array Typ",
+			description = "Nur Schleifen über Arrays dieses Typ wird die Schleife umgewandelt",
+            example = "\"org.eclipse.core.runtime.IExtension\"")
+	@With
+	private String className;
+	
+	@Override
+	public @DisplayName String getDisplayName() {
+		return "Convert IExtension to foreach";
+	}
+
+	@Override
+	public @Description String getDescription() {
+		return "Convert for loops to foreach loops for IExtension array only.";
+	}
+	
+	@Override
+	public TreeVisitor<?, ExecutionContext> getVisitor() {
+		return new ConvertIExtensionForToForeachLoopVisitor();
+	}
+
+       class ConvertIExtensionForToForeachLoopVisitor extends JavaIsoVisitor<ExecutionContext> {
+    	   
+            @Override
+            public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
+                block = super.visitBlock(block, ctx);
+
+                List<Statement> statements = block.getStatements();
+                for (int i = 0; i < statements.size(); i++) {
+                    Statement stmt = statements.get(i);
+                    if (!(stmt instanceof J.ForLoop forLoop)) {
+						continue;
+					}
+
+                    // Schritt 1: Indexvariable prüfen
+                    if (!(forLoop.getControl().getInit().size() == 1 &&
+                            forLoop.getControl().getInit().get(0) instanceof J.VariableDeclarations initVar)) {
+                        continue;
+                    }
+
+                    J.VariableDeclarations.NamedVariable indexVar = initVar.getVariables().get(0);
+                    String indexName = indexVar.getSimpleName();
+
+                    // Schritt 2: Bedingung i < array.length
+                    Expression condition = forLoop.getControl().getCondition();
+                    if (!(condition instanceof J.Binary binary) || !binary.getOperator().equals(J.Binary.Type.LessThan)) {
+                        continue;
+                    }
+
+                    if (!(binary.getLeft() instanceof J.Identifier leftId) || !leftId.getSimpleName().equals(indexName)) {
+                        continue;
+                    }
+
+                    if (!(binary.getRight() instanceof J.FieldAccess fa) || !fa.getSimpleName().equals("length")) {
+                        continue;
+                    }
+
+                    if (!(fa.getTarget() instanceof J.Identifier arrayId)) {
+						continue;
+					}
+                    String arrayName = arrayId.getSimpleName();
+
+                    // Schritt 3: Zugriff array[i] im ersten Statement im Body
+                    if (!(forLoop.getBody() instanceof J.Block forBody) || forBody.getStatements().isEmpty()) {
+						continue;
+					}
+
+                    Statement firstStmt = forBody.getStatements().get(0);
+                    if (!(firstStmt instanceof J.VariableDeclarations elemDecl)) {
+						continue;
+					}
+
+                    J.VariableDeclarations.NamedVariable loopVar = elemDecl.getVariables().get(0);
+                    if (!(loopVar.getInitializer() instanceof J.ArrayAccess arrayAccess)) {
+						continue;
+					}
+
+                    Expression indexed = arrayAccess.getIndexed();
+                    ArrayDimension dimension = arrayAccess.getDimension();
+
+                    if (!(indexed instanceof J.Identifier indexedId) || !indexedId.getSimpleName().equals(arrayName)) {
+						continue;
+					}
+                    if (!(dimension.getIndex() instanceof J.Identifier dimId) || !dimId.getSimpleName().equals(indexName)) {
+						continue;
+					}
+
+                    // Schritt 4: Typprüfung
+                    JavaType indexedType = indexed.getType();
+                    if (!(indexedType instanceof JavaType.Array jArrayType)) {
+						continue;
+					}
+                    JavaType elemType = jArrayType.getElemType();
+                    if (!(elemType instanceof JavaType.Class elemClass)) {
+						continue;
+					}
+
+                    String actualType = elemClass.getFullyQualifiedName();
+                    if (!actualType.equals(className)) {
+						continue;
+					}
+
+                    J.Identifier typeId = indexedId.withSimpleName(className).withType(elemType);
+                    J.Identifier varId = loopVar.getName();
+                    J.Identifier arrId = arrayId;
+
+                    List<Statement> newBodyStatements = forBody.getStatements().subList(1, forBody.getStatements().size());
+                    J.Block newBody = forBody.withStatements(newBodyStatements);
+
+                    // Schritt 5: Template anwenden
+					VariableDeclarations varDec = new VariableDeclarations(
+								Tree.randomId(), 
+								Space.SINGLE_SPACE, 
+								Markers.EMPTY, 
+								Collections.emptyList(), 
+								Collections.emptyList(), typeId, Space.EMPTY, Collections.emptyList(), Collections.emptyList());
+					
+					@Nullable
+					JLeftPadded<Expression> init;
+					@Nullable
+					Variable type = loopVar.getVariableType();
+					JavaCoordinates coordinates = leftId.getCoordinates().replace();
+					NamedVariable namedVariable = JavaTemplate.apply(className + " " + varId, getCursor(), coordinates  );
+					List<NamedVariable> vars = Arrays.asList(namedVariable);
+					varDec = varDec.withVariables(vars);
+					
+					JRightPadded<VariableDeclarations> variable = JRightPadded.build(varDec).withAfter(Space.SINGLE_SPACE);
+					JRightPadded<Expression> iterable = JRightPadded.build(arrId);
+					J.ForEachLoop.Control loopControll = new J.ForEachLoop.Control(Tree.randomId(), Space.SINGLE_SPACE, Markers.EMPTY, variable, iterable);
+					JRightPadded<Statement> tmp = new JRightPadded<Statement>(newBody, Space.SINGLE_SPACE, Markers.EMPTY);
+					J.ForEachLoop foreach = new J.ForEachLoop(
+						    Tree.randomId(),
+						    forLoop.getPrefix(),
+						    Markers.EMPTY,
+						    loopControll,
+						    tmp 
+						);
+                    // Neue Statementsliste mit foreach ersetzen
+                    List<Statement> newStatements = List.copyOf(statements.subList(0, i));
+                    newStatements = new java.util.ArrayList<>(newStatements);
+                    newStatements.add(foreach);
+                    newStatements.addAll(statements.subList(i + 1, statements.size()));
+
+                    return block.withStatements(newStatements);
+                }
+
+                return block;
+            }
+        
+    }
+}

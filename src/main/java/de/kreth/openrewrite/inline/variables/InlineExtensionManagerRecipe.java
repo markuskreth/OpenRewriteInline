@@ -14,7 +14,7 @@ public class InlineExtensionManagerRecipe extends Recipe {
 
 	@Override
 	public String getDescription() {
-		return getDisplayName();
+		return getDisplayName() + ".";
 	}
 
     @Override
