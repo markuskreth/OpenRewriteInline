@@ -64,6 +64,45 @@ class ConvertForToForeachLoopTest implements RewriteTest {
     }
 
     @Test
+    void replaceForLoopWithForeachOverIConfigurationElementArryNotIConfigurationElementArray() {
+        rewriteRun(
+        		spec -> spec.recipe(new ConvertIExtensionForToForeachLoopRecipe()
+        				.withClassName("org.eclipse.core.runtime.IConfigurationElement")),
+                java("""
+                import org.eclipse.core.runtime.IExtension;
+                import org.eclipse.core.runtime.IConfigurationElement;
+
+                public class ExtensionArrayLoop {
+                    public void loop(IExtension[] extensions) {
+                        for (int i = 0; i < extensions.length; i++) {
+                            IExtension extension = extensions[i];
+                            IConfigurationElement[] elements = extension.getConfigurationElements();
+                            for (int j = 0; j < elements.length; j++) {
+                                IConfigurationElement element = elements[j];
+                                System.out.println(element.getName());
+                            }
+                        }
+                    }
+                }
+                ""","""
+                import org.eclipse.core.runtime.IExtension;
+                import org.eclipse.core.runtime.IConfigurationElement;
+
+                public class ExtensionArrayLoop {
+                    public void loop(IExtension[] extensions) {
+                        for (int i = 0; i < extensions.length; i++) {
+                            IExtension extension = extensions[i];
+                            IConfigurationElement[] elements = extension.getConfigurationElements();
+                            for (IConfigurationElement element : elements) {
+                                System.out.println(element.getName());
+                            }
+                        }
+                    }
+                }
+                """));
+    }
+
+    @Test
     void doNotReplaceForOverStringArray() {
 		rewriteRun(
 				java("""

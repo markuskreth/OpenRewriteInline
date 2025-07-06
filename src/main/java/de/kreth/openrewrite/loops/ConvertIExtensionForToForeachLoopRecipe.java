@@ -3,6 +3,7 @@ package de.kreth.openrewrite.loops;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
@@ -16,6 +17,7 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.J.ArrayAccess;
 import org.openrewrite.java.tree.J.ArrayDimension;
 import org.openrewrite.java.tree.J.ForLoop;
 import org.openrewrite.java.tree.J.VariableDeclarations;
@@ -102,31 +104,11 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 						continue;
 					}
 
-                    Expression indexed = arrayAccess.getIndexed();
-                    ArrayDimension dimension = arrayAccess.getDimension();
-
-                    if (!(indexed instanceof J.Identifier indexedId) || !indexedId.getSimpleName().equals(arrayName)) {
-						continue;
-					}
-                    if (!(dimension.getIndex() instanceof J.Identifier dimId) || !dimId.getSimpleName().equals(indexName)) {
-						continue;
-					}
-
                     // Schritt 4: Typprüfung
-                    JavaType indexedType = indexed.getType();
-                    if (!(indexedType instanceof JavaType.Array jArrayType)) {
+					if (!correctType(arrayAccess, arrayName, indexName)) {
 						continue;
 					}
-                    JavaType elemType = jArrayType.getElemType();
-                    if (!(elemType instanceof JavaType.Class elemClass)) {
-						continue;
-					}
-
-                    String actualType = elemClass.getFullyQualifiedName();
-                    if (!actualType.equals(className)) {
-						continue;
-					}
-
+					
                     J.Identifier varId = loopVar.getName();
 
                     List<Statement> newBodyStatements = forBody.getStatements().subList(1, forBody.getStatements().size());
@@ -179,6 +161,44 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 
                 return block;
             }
+
+			private boolean correctType(ArrayAccess arrayAccess, String arrayName, String indexName) {
+
+                Optional<JavaType> indexedTypeOpt = getIndexedType(arrayAccess, arrayName, indexName);
+                if (indexedTypeOpt.isEmpty()) {
+                	return false;
+                }
+                JavaType indexedType = indexedTypeOpt.get();
+                if (!(indexedType instanceof JavaType.Array jArrayType)) {
+                	return false;
+				}
+                JavaType elemType = jArrayType.getElemType();
+                if (!(elemType instanceof JavaType.Class elemClass)) {
+                	return false;
+				}
+
+                String actualType = elemClass.getFullyQualifiedName();
+                if (!actualType.equals(className)) {
+                	return false;
+				}
+                
+				return true;
+			}
+
+			private Optional<JavaType> getIndexedType(ArrayAccess arrayAccess, String arrayName, String indexName) {
+
+                ArrayDimension dimension = arrayAccess.getDimension();
+                Expression indexed = arrayAccess.getIndexed();
+
+                if (!(indexed instanceof J.Identifier indexedId) || !indexedId.getSimpleName().equals(arrayName)) {
+                	return Optional.empty();
+				}
+                if (!(dimension.getIndex() instanceof J.Identifier dimId) || !dimId.getSimpleName().equals(indexName)) {
+                	return Optional.empty();
+				}
+
+                return Optional.of(indexed.getType());
+			}
 
 			private J.Identifier getRightFieldIdentifier(ForLoop forLoop, String indexName) {
                 
