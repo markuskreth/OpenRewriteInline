@@ -25,9 +25,10 @@ class ConvertForToForeachLoopTest implements RewriteTest {
 
     @Test
     void replaceForLoopWithForeachOverIExtensionArryNotIConfigurationElementArray() {
-        rewriteRun(
+		rewriteRun(
         		spec -> spec.recipe(new ConvertIExtensionForToForeachLoopRecipe()
         				.withClassName("org.eclipse.core.runtime.IExtension")),
+        		
                 java("""
                 import org.eclipse.core.runtime.IExtension;
                 import org.eclipse.core.runtime.IConfigurationElement;
@@ -57,7 +58,7 @@ class ConvertForToForeachLoopTest implements RewriteTest {
                                 IConfigurationElement element = elements[j];
                                 System.out.println(element.getName());
                             }
-                        }
+                        } 
                     }
                 }
                 """));
@@ -66,8 +67,10 @@ class ConvertForToForeachLoopTest implements RewriteTest {
     @Test
     void replaceForLoopWithForeachOverIConfigurationElementArryNotIConfigurationElementArray() {
         rewriteRun(
-        		spec -> spec.recipe(new ConvertIExtensionForToForeachLoopRecipe()
-        				.withClassName("org.eclipse.core.runtime.IConfigurationElement")),
+        		spec -> 
+        			spec.recipe(new ConvertIExtensionForToForeachLoopRecipe()
+            				.withClassName("org.eclipse.core.runtime.IConfigurationElement"))
+        		,
                 java("""
                 import org.eclipse.core.runtime.IExtension;
                 import org.eclipse.core.runtime.IConfigurationElement;
@@ -95,7 +98,7 @@ class ConvertForToForeachLoopTest implements RewriteTest {
                             IConfigurationElement[] elements = extension.getConfigurationElements();
                             for (IConfigurationElement element : elements) {
                                 System.out.println(element.getName());
-                            }
+                            } 
                         }
                     }
                 }
@@ -103,8 +106,41 @@ class ConvertForToForeachLoopTest implements RewriteTest {
     }
 
     @Test
+    void doReplaceForOverStringArray() {
+		rewriteRun(
+        		spec -> spec.recipes(
+        				new ConvertIExtensionForToForeachLoopRecipe()
+        				.withClassName("java.lang.String")),
+				java("""
+						public class StringArrayLoop {
+					    public void loop() {
+					        String[] strings = {"one", "two", "three"};
+					        for (int i = 0; i < strings.length; i++) {
+						        String str = strings[i]; 
+					            System.out.println(str);
+					        }
+					    }
+					}
+					""", """
+					public class StringArrayLoop {
+				    public void loop() {
+				        String[] strings = {"one", "two", "three"};
+				        for (String str : strings) { 
+				            System.out.println(str);
+				        }
+				    }
+				}
+				"""));
+    }
+
+    @Test
     void doNotReplaceForOverStringArray() {
 		rewriteRun(
+        		spec -> spec.recipes(
+        				new ConvertIExtensionForToForeachLoopRecipe()
+        				.withClassName("org.eclipse.core.runtime.IExtension"), 
+        				new ConvertIExtensionForToForeachLoopRecipe()
+        				.withClassName("org.eclipse.core.runtime.IConfigurationElement")),
 				java("""
 				public class StringArrayLoop {
 				    public void loop() {
@@ -120,6 +156,11 @@ class ConvertForToForeachLoopTest implements RewriteTest {
     @Test
     void doNotReplaceForOverIntArray() {
 		rewriteRun(
+        		spec -> spec.recipes(
+        				new ConvertIExtensionForToForeachLoopRecipe()
+        				.withClassName("org.eclipse.core.runtime.IExtension"), 
+        				new ConvertIExtensionForToForeachLoopRecipe()
+        				.withClassName("org.eclipse.core.runtime.IConfigurationElement")),
 				java("""
 				public class StringArrayLoop {
 				    public void loop() {
