@@ -11,7 +11,9 @@ class ConvertForToForeachLoopTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-		spec.parser(JavaParser.fromJavaVersion().classpath(
+		spec.parser(JavaParser
+				.fromJavaVersion()
+				.classpath(
                     "org.eclipse.core.runtime",
                     "org.eclipse.osgi",
                     "org.eclipse.equinox.common",
@@ -106,6 +108,71 @@ class ConvertForToForeachLoopTest implements RewriteTest {
     }
 
     @Test
+    void dontReplaceForLoopWithWithArrayAccessSideEffect() {
+        rewriteRun(
+        		spec -> 
+        			spec.recipe(new ConvertIExtensionForToForeachLoopRecipe()
+            				.withClassName("org.eclipse.core.runtime.IConfigurationElement"))
+        		,
+                java("""
+                        import org.eclipse.core.runtime.IExtension;
+                        import org.eclipse.core.runtime.IConfigurationElement;
+
+                        public class ExtensionArrayLoop {
+                            public void loop(IExtension[] extensions) {
+                                for (int i = 0; i < extensions.length; i++) {
+                                    IExtension extension = extensions[i];
+                                    IConfigurationElement[] elements = extension.getConfigurationElements();
+                                    for (int j = 1; j < elements.length; j++) {
+                                        System.out.println(elements[j-1].getName());
+                                    }
+                                }
+                            }
+                        }
+                        """, """
+                        import org.eclipse.core.runtime.IExtension;
+                        import org.eclipse.core.runtime.IConfigurationElement;
+
+                        public class ExtensionArrayLoop {
+                            public void loop(IExtension[] extensions) {
+                                for (int i = 0; i < extensions.length; i++) {
+                                    IExtension extension = extensions[i];
+                                    IConfigurationElement[] elements = extension.getConfigurationElements();
+                                    for (int j = 1; j < elements.length; j++) {
+                                        System.out.println(elements/*~~(This makes conversion to foreach loop impossible.)~~>*/[j-1].getName());
+                                    }
+                                }
+                            }
+                        }
+                        """));
+    }
+
+    @Test
+    void dontReplaceForLoopWithWithWrongIndexVar() {
+        rewriteRun(
+        		spec -> 
+        			spec.recipe(new ConvertIExtensionForToForeachLoopRecipe()
+            				.withClassName("org.eclipse.core.runtime.IConfigurationElement"))
+        		,
+                java("""
+                import org.eclipse.core.runtime.IExtension;
+                import org.eclipse.core.runtime.IConfigurationElement;
+
+                public class ExtensionArrayLoop {
+                    public void loop(IExtension[] extensions) {
+                        for (int i = 0; i < extensions.length; i++) {
+                            IExtension extension = extensions[i];
+                            IConfigurationElement[] elements = extension.getConfigurationElements();
+                            for (int j = 1; j < elements.length; j++) {
+                                System.out.println(elements[i].getName());
+                            }
+                        }
+                    }
+                }
+                """));
+    }
+
+    @Test
     void doReplaceForOverStringArray() {
 		rewriteRun(
         		spec -> spec.recipes(
@@ -134,6 +201,69 @@ class ConvertForToForeachLoopTest implements RewriteTest {
     }
 
     @Test
+    void doReplaceForOverStringArrayReplaceAllUsages() {
+		rewriteRun(
+        		spec -> spec.recipes(
+        				new ConvertIExtensionForToForeachLoopRecipe()
+        				.withClassName("java.lang.String")),
+				java("""
+						public class StringArrayLoop {
+					    public void loop() {
+					        String[] strings = {"one", "two", "three"};
+					        for (int i = 0; i < strings.length; i++) {
+					            System.out.println(strings[i]);
+						        String str = strings[i]; 
+					            System.out.println(strings[i].length());
+					            System.out.println(str.isBlank());
+					        }
+					    }
+					}
+					""", """
+					public class StringArrayLoop {
+				    public void loop() {
+				        String[] strings = {"one", "two", "three"};
+				        for (String str : strings) {
+				            System.out.println(str);
+				            System.out.println(str.length());
+				            System.out.println(str.isBlank());
+				        }
+				    }
+				}
+				"""));
+    }
+
+    @Test
+    void doReplaceForOverStringArrayReplaceAllUsagesWithVarDec() {
+		rewriteRun(
+        		spec -> spec.recipes(
+        				new ConvertIExtensionForToForeachLoopRecipe()
+        				.withClassName("java.lang.String")),
+				java("""
+						public class StringArrayLoop {
+					    public void loop() {
+					        String[] strings = {"one", "two", "three"};
+					        for (int i = 0; i < strings.length; i++) {
+					            System.out.println(strings[i]);
+					            System.out.println(strings[i].length());
+					            System.out.println(strings[i].isBlank());
+					        }
+					    }
+					}
+					""", """
+					public class StringArrayLoop {
+				    public void loop() {
+				        String[] strings = {"one", "two", "three"};
+				        for (String string : strings) {
+				            System.out.println(string);
+				            System.out.println(string.length());
+				            System.out.println(string.isBlank());
+				        }
+				    }
+				}
+				"""));
+    }
+
+    @Test
     void doNotReplaceForOverStringArray() {
 		rewriteRun(
         		spec -> spec.recipes(
@@ -152,7 +282,7 @@ class ConvertForToForeachLoopTest implements RewriteTest {
 				}
 				"""));
     }
-    
+
     @Test
     void doNotReplaceForOverIntArray() {
 		rewriteRun(

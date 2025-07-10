@@ -1,5 +1,6 @@
 package de.kreth.openrewrite.loops;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -17,15 +18,14 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.J.ArrayAccess;
-import org.openrewrite.java.tree.J.ArrayDimension;
+import org.openrewrite.java.tree.J.Block;
 import org.openrewrite.java.tree.J.ForEachLoop;
 import org.openrewrite.java.tree.J.ForLoop;
 import org.openrewrite.java.tree.J.Identifier;
 import org.openrewrite.java.tree.J.VariableDeclarations;
-import org.openrewrite.java.tree.J.VariableDeclarations.NamedVariable;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.JavaType.Variable;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeTree;
@@ -78,7 +78,7 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 					continue;
 				}
 
-				// Schritt 1: Indexvariable prüfen
+				// Step 1: validate Index variable
 				Optional<VariableDeclarations> indexVariable = getIndexVariable(forLoop);
 				if (indexVariable.isEmpty()) {
 					continue;
@@ -86,39 +86,57 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 				VariableDeclarations initVar = indexVariable.get();
 				
 				J.VariableDeclarations.NamedVariable indexVar = initVar.getVariables().get(0);
-				String indexName = indexVar.getSimpleName();
+				String indexVariableName = indexVar.getSimpleName();
 
-				Optional<J.Identifier> arrayId = getRightFieldIdentifierSimpleName(forLoop, indexName);
+				// Step 2: get Array Variable
+				Optional<J.Identifier> arrayId = getRightFieldIdentifierSimpleName(forLoop, indexVariableName);
 				if (arrayId.isEmpty()) {
 					continue;
 				}
 				
-				// Schritt 3: Zugriff array[i] im ersten Statement im Body
+				// Step 3: body without statements
 				if (!(forLoop.getBody() instanceof J.Block forBody) 
 						|| forBody.getStatements().isEmpty()) {
 					continue;
 				}
 
-				Statement firstStmt = forBody.getStatements().get(0);
-				if (!(firstStmt instanceof J.VariableDeclarations elemDecl)) {
-					continue;
-				}
-
-				J.VariableDeclarations.NamedVariable loopVar = elemDecl.getVariables().get(0);
-				if (!(loopVar.getInitializer() instanceof J.ArrayAccess arrayAccess)) {
-					continue;
-				}
-
-				// Schritt 4: Typprüfung
 				Identifier arrayIdentifier = arrayId.get().withPrefix(Space.SINGLE_SPACE);
-				if (!correctType(arrayAccess, arrayIdentifier, indexName)) {
-					continue;
+
+				// Step 4: Typprüfung				
+				Optional<VariableDeclarations.NamedVariable> elementVariable = FindArrayAccesses
+						.findElementVariable(forBody, className, indexVariableName, arrayIdentifier);
+
+				// Step 5: ForEach Loop creation.
+				Identifier name;
+				if (elementVariable.isEmpty()) {
+
+					if(arrayIdentifier.getType() instanceof JavaType.Array arrayType) {
+						if (!arrayType.getElemType().toString().equals(className)) {
+							continue;
+						}
+					} else {
+						continue;
+					}
+					String simpleClassName = getSimpleClassName();
+					String n2 = Character.toLowerCase(simpleClassName.charAt(0)) + simpleClassName.substring(1);
+					@Nullable
+					Variable n4 = null;
+					name = new Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, Collections.emptyList(), n2, arrayType.getElemType(), n4);
+				} else {
+					J.VariableDeclarations.NamedVariable loopVar = elementVariable.get();
+					name = loopVar.getName();
 				}
-				JRightPadded<VariableDeclarations> variable = createNewLoopVariable(loopVar);
+				Optional<Block> hasIllegalArrayVariableAccess = IllegalArrayVariableAccess
+						.hasIllegalArrayVariableAccess(forBody, indexVariableName, arrayIdentifier);
+				if (hasIllegalArrayVariableAccess.isPresent()) {
+					statements.set(i, forLoop.withBody(hasIllegalArrayVariableAccess.get()));
+					return block.withStatements(statements);
+				}
+				JRightPadded<VariableDeclarations> variable = createNewLoopVariable(name);
 				JRightPadded<Expression> iterable = JRightPadded.build(arrayIdentifier);
 				
-				List<Statement> newBodyStatements = forBody.getStatements().subList(1, forBody.getStatements().size());
-				J.Block newBody = forBody.withStatements(newBodyStatements);
+				J.Block newBody = ReplaceArrayVariableAccess
+						.replaceArrayVariableAccessVisitor(forBody, className, indexVariableName, arrayIdentifier, name, ctx);
 				
 				JRightPadded<Statement> body = JRightPadded.build((Statement)newBody)
 						.withAfter(Space.EMPTY)
@@ -126,7 +144,7 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 
 				J.ForEachLoop foreach = createNewForEachLoop(forLoop, variable, iterable, body);
 				// Neue Statementsliste mit foreach ersetzen
-				List<Statement> newStatements = extracted(statements, i, foreach);
+				List<Statement> newStatements = replaceForStatement(statements, i, foreach);
 
 				return block.withStatements(newStatements);
 			}
@@ -134,14 +152,17 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 			return block;
 		}
 
-		private List<Statement> extracted(List<Statement> statements, int i, J.ForEachLoop foreach) {
-			List<Statement> newStatements = List.copyOf(statements.subList(0, i));
-			newStatements = new java.util.ArrayList<>(newStatements);
+		private List<Statement> replaceForStatement(List<Statement> statements, int i, J.ForEachLoop foreach) {
+			List<Statement> statementsBeforeLoop = statements.subList(0, i);
+			List<Statement> statementsAfterLoop = statements.subList(i + 1, statements.size());
+			
+			List<Statement> newStatements = new ArrayList<>();
+			newStatements.addAll(statementsBeforeLoop);
 			newStatements.add(foreach);
-			newStatements.addAll(statements.subList(i + 1, statements.size()));
+			newStatements.addAll(statementsAfterLoop);
 			return newStatements;
 		}
-
+		
 		private ForEachLoop createNewForEachLoop(ForLoop forLoop, JRightPadded<VariableDeclarations> variable,
 				JRightPadded<Expression> iterable, JRightPadded<Statement> body) {
 			J.ForEachLoop.Control loopControll = new J.ForEachLoop.Control(Tree.randomId(), Space.SINGLE_SPACE,
@@ -149,21 +170,19 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 			return new J.ForEachLoop(Tree.randomId(), forLoop.getPrefix(), forLoop.getMarkers(),
 					loopControll, body);
 		}
+		
+		private JRightPadded<VariableDeclarations> createNewLoopVariable(J.Identifier varId) {
 
-		private JRightPadded<VariableDeclarations> createNewLoopVariable(NamedVariable loopVar) {
-
-			J.Identifier varId = loopVar.getName();
 			VariableDeclarations.NamedVariable var = new VariableDeclarations.NamedVariable(Tree.randomId(),
 					Space.SINGLE_SPACE, Markers.EMPTY, varId.withId(Tree.randomId()), Collections.emptyList(), null,
 					null);
 			VariableDeclarations varDec = createLoopVariable(var);
 			return JRightPadded.build(varDec.withType(JavaType.buildType(className))).withAfter(Space.SINGLE_SPACE);
-
 		}
-
+		
 		private VariableDeclarations createLoopVariable(VariableDeclarations.NamedVariable var) {
 
-			String simpleClassName = className.substring(className.lastIndexOf('.') + 1);
+			String simpleClassName = getSimpleClassName();
 			@Nullable
 			TypeTree varType = TypeTree.build(simpleClassName);
 
@@ -172,6 +191,11 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 					Arrays.asList(JRightPadded.build(var)));
 		}
 
+		private String getSimpleClassName() {
+			String simpleClassName = className.substring(className.lastIndexOf('.') + 1);
+			return simpleClassName;
+		}
+		
 		private Optional<J.VariableDeclarations> getIndexVariable(J.ForLoop forLoop) {
 			if (forLoop.getControl().getInit().size() == 1
 					&& forLoop.getControl().getInit().get(0) instanceof J.VariableDeclarations initVar) {
@@ -180,47 +204,8 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 			return Optional.empty();
 		}
 
-		private boolean correctType(ArrayAccess arrayAccess, Identifier identifier, String indexName) {
-
-			Optional<JavaType> indexedTypeOpt = getIndexedType(arrayAccess, identifier, indexName);
-			if (indexedTypeOpt.isEmpty()) {
-				return false;
-			}
-			JavaType indexedType = indexedTypeOpt.get();
-			if (!(indexedType instanceof JavaType.Array jArrayType)) {
-				return false;
-			}
-			JavaType elemType = jArrayType.getElemType();
-			if (!(elemType instanceof JavaType.Class elemClass)) {
-				return false;
-			}
-
-			String actualType = elemClass.getFullyQualifiedName();
-			if (!actualType.equals(className)) {
-				return false;
-			}
-
-			return true;
-		}
-
-		private Optional<JavaType> getIndexedType(ArrayAccess arrayAccess, Identifier identifier, String indexName) {
-
-			ArrayDimension dimension = arrayAccess.getDimension();
-			Expression indexed = arrayAccess.getIndexed();
-
-			if (!(indexed instanceof J.Identifier indexedId) || !indexedId.getSimpleName().equals(identifier.getSimpleName())) {
-				return Optional.empty();
-			}
-			if (!(dimension.getIndex() instanceof J.Identifier dimId) || !dimId.getSimpleName().equals(indexName)) {
-				return Optional.empty();
-			}
-
-			return Optional.of(indexed.getType());
-		}
-
 		private Optional<J.Identifier> getRightFieldIdentifierSimpleName(ForLoop forLoop, String indexName) {
 
-			// Schritt 2: Bedingung i < array.length
 			Expression condition = forLoop.getControl().getCondition();
 			if (!(condition instanceof J.Binary binary) || !binary.getOperator().equals(J.Binary.Type.LessThan)) {
 				return Optional.empty();
