@@ -18,9 +18,13 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.J.AssignmentOperation;
+import org.openrewrite.java.tree.J.Binary;
 import org.openrewrite.java.tree.J.Block;
+import org.openrewrite.java.tree.J.FieldAccess;
 import org.openrewrite.java.tree.J.ForEachLoop;
 import org.openrewrite.java.tree.J.ForLoop;
+import org.openrewrite.java.tree.J.ForLoop.Control;
 import org.openrewrite.java.tree.J.Identifier;
 import org.openrewrite.java.tree.J.VariableDeclarations;
 import org.openrewrite.java.tree.JRightPadded;
@@ -30,6 +34,7 @@ import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.SearchResult;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -43,6 +48,8 @@ import lombok.With;
 @NoArgsConstructor
 public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 
+	private static final String MARKER_TEXT = "This makes conversion to foreach loop impossible.";
+	
 	@Option(
 			displayName = "Verarbeiteter Array Typ", 
 			description = "Nur Schleifen über Arrays dieses Typ wird die Schleife umgewandelt", 
@@ -67,17 +74,104 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 
 	class ConvertIExtensionForToForeachLoopVisitor extends JavaIsoVisitor<ExecutionContext> {
 
+		private Identifier arrayIdentifier;
+		private final List<Block> illegalBlocks = new ArrayList<>();
+		
+		public Optional<Control> hasIllegalControl(Control c, String arrayName) {
+			
+			if (isIteratingOverArray(c.getCondition(), arrayName)) {
+				List<Statement> update = c.getUpdate();
+				if (update.size() > 1) {
+					update.add(0, SearchResult.found(update.remove(0), MARKER_TEXT));
+					return Optional.of(c.withUpdate(update));
+				}
+				if (update.size() == 1) {
+					if (update.get(0) instanceof AssignmentOperation assOp) {
+						Expression assignment = assOp.getAssignment();
+						if (assignment instanceof J.Literal j) {
+							@Nullable
+							Object literalValue = j.getValue();
+							if (literalValue instanceof Integer i) {
+								if (i.intValue() != 1) {
+									return Optional.of(c.withUpdate(Arrays.asList(SearchResult.found(assOp, MARKER_TEXT))));
+								}
+							}
+						}
+						if (!assOp.getOperator().equals(AssignmentOperation.Type.Addition)) {
+							return Optional.of(c.withUpdate(Arrays.asList(SearchResult.found(assOp, MARKER_TEXT))));
+						}
+					}
+				}
+			}
+			return Optional.empty();
+		}
+
+		private boolean isIteratingOverArray(Expression condition, String arrayName) {
+			if (condition instanceof Binary bin) {
+				if (bin.getRight() instanceof FieldAccess fieldAccess) {
+					if (fieldAccess.getTarget() instanceof Identifier arrId) {
+						if (arrId.getSimpleName().equals(arrayName)) {
+							return true;
+						}
+					}
+				}
+			}
+			return false;
+		}
+
+		@Override
+		public ForLoop visitForLoop(ForLoop forLoop, ExecutionContext p) {
+			ForLoop visitForLoop = super.visitForLoop(forLoop, p);
+
+			// Step 1: validate Index variable
+			Optional<VariableDeclarations> indexVariable = getIndexVariable(forLoop);
+			if (indexVariable.isEmpty()) {
+				return visitForLoop;
+			}
+			VariableDeclarations initVar = indexVariable.get();
+			
+			J.VariableDeclarations.NamedVariable indexVar = initVar.getVariables().get(0);
+			String indexVariableName = indexVar.getSimpleName();
+
+			// Step 2: get Array Variable
+			Optional<J.Identifier> arrayId = getRightFieldIdentifierSimpleName(forLoop, indexVariableName);
+			if (arrayId.isEmpty()) {
+				return visitForLoop;
+			}
+
+			// Step 3: body without statements
+			if (!(forLoop.getBody() instanceof J.Block forBody) 
+					|| forBody.getStatements().isEmpty()) {
+				return visitForLoop;
+			}
+
+			arrayIdentifier = arrayId.get().withPrefix(Space.SINGLE_SPACE);
+
+			Optional<Control> hc = hasIllegalControl(visitForLoop.getControl(), arrayIdentifier.toString());
+			if (hc.isPresent()) {
+				
+				if (forLoop.getBody() instanceof Block body) {
+					illegalBlocks.add(body);
+					return visitForLoop.withControl(hc.get());
+				}
+			}
+			
+			return visitForLoop;
+		}
+		
 		@Override
 		public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
 			block = super.visitBlock(block, ctx);
 
+			if (illegalBlocks.contains(block)) {
+				return block;
+			}
 			List<Statement> statements = block.getStatements();
 			for (int i = 0; i < statements.size(); i++) {
 				Statement stmt = statements.get(i);
 				if (!(stmt instanceof J.ForLoop forLoop)) {
 					continue;
 				}
-
 				// Step 1: validate Index variable
 				Optional<VariableDeclarations> indexVariable = getIndexVariable(forLoop);
 				if (indexVariable.isEmpty()) {
@@ -100,12 +194,18 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 					continue;
 				}
 
-				Identifier arrayIdentifier = arrayId.get().withPrefix(Space.SINGLE_SPACE);
+				arrayIdentifier = arrayId.get().withPrefix(Space.SINGLE_SPACE);
 
 				// Step 4: Typprüfung				
 				Optional<VariableDeclarations.NamedVariable> elementVariable = FindArrayAccesses
 						.findElementVariable(forBody, className, indexVariableName, arrayIdentifier);
 
+				Optional<Control> illegalControl = hasIllegalControl(forLoop.getControl(), arrayIdentifier.toString());
+				if (illegalControl.isPresent()) {
+					statements.remove(i);
+					statements.add(i, forLoop.withControl(illegalControl.get()));
+					return block.withStatements(statements);
+				}
 				// Step 5: ForEach Loop creation.
 				Identifier name;
 				if (elementVariable.isEmpty()) {
@@ -130,6 +230,12 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 						.hasIllegalArrayVariableAccess(forBody, indexVariableName, arrayIdentifier);
 				if (hasIllegalArrayVariableAccess.isPresent()) {
 					statements.set(i, forLoop.withBody(hasIllegalArrayVariableAccess.get()));
+					return block.withStatements(statements);
+				}
+				Optional<J.Block> illegalIndexUsages = FindIdentifierUsagesBesides
+						.findUsages(indexVar.getDeclarator().getNames().get(0), arrayIdentifier, forBody);
+				if (illegalIndexUsages.isPresent()) {
+					statements.set(i, forLoop.withBody(illegalIndexUsages.get()));
 					return block.withStatements(statements);
 				}
 				JRightPadded<VariableDeclarations> variable = createNewLoopVariable(name);
@@ -225,4 +331,9 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 			return Optional.of(arrayId);
 		}
 	}
+
+	static <T extends J> T found(T argId) {
+		return SearchResult.found(argId, MARKER_TEXT);
+	}
+	
 }
