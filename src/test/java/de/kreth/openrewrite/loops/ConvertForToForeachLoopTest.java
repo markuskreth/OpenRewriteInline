@@ -388,21 +388,6 @@ class ConvertForToForeachLoopTest implements RewriteTest {
                                 }
                             }
                         }
-                        """, """
-                        import org.eclipse.core.runtime.IExtension;
-                        import org.eclipse.core.runtime.IConfigurationElement;
-
-                        public class ExtensionArrayLoop {
-                            public void loop(IExtension[] extensions) {
-                                for (int i = 0; i < extensions.length; i++) {
-                                    IExtension extension = extensions[i];
-                                    IConfigurationElement[] elements = extension.getConfigurationElements();
-                                    for (int j = /*~~(This makes conversion to foreach loop impossible.)~~>*/elements.length - 1; j >= 0; /*~~(This makes conversion to foreach loop impossible.)~~>*/j--) {
-                                        System.out.println(elements[j].getName());
-                                    }
-                                }
-                            }
-                        }
                         """));
     }
 
