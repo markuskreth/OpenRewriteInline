@@ -6,15 +6,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.J.ArrayAccess;
-import org.openrewrite.java.tree.J.ArrayDimension;
-import org.openrewrite.java.tree.J.Binary;
-import org.openrewrite.java.tree.J.Block;
-import org.openrewrite.java.tree.J.Identifier;
-import org.openrewrite.java.tree.J.MethodInvocation;
+import org.openrewrite.java.tree.J.*;
 import org.openrewrite.java.tree.Statement;
 
 public class FindIdentifierUsagesBesides {
@@ -27,7 +23,7 @@ public class FindIdentifierUsagesBesides {
 		}
 		return Optional.empty();
 	}
-	
+
 	static class FindIdentifierVisitor extends JavaIsoVisitor<AtomicBoolean> {
 
 		private final Identifier var;
@@ -57,11 +53,11 @@ public class FindIdentifierUsagesBesides {
 			}
 			return visitStatement;
 		}
-		
+
 		@Override
 		public ArrayAccess visitArrayAccess(ArrayAccess arrayAccess, AtomicBoolean p) {
 			ArrayAccess visitArrayAccess = super.visitArrayAccess(arrayAccess, p);
-			
+
 			ArrayDimension dimension = visitArrayAccess.getDimension();
 			if (dimension.getIndex() instanceof Identifier indexVar) {
 				if (equalsVar(indexVar)) {
@@ -76,7 +72,7 @@ public class FindIdentifierUsagesBesides {
 			}
 			return visitArrayAccess;
 		}
-		
+
 		@Override
 		public Binary visitBinary(Binary binary, AtomicBoolean p) {
 			Binary bin = super.visitBinary(binary, p);

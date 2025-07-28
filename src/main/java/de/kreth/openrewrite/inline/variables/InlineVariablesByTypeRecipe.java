@@ -27,9 +27,9 @@ import lombok.With;
 public class InlineVariablesByTypeRecipe extends Recipe {
 
 	@With
-	@Option(example = 
-			"org.eclipse.core.runtime.IExtensionPoint, "
-			+ "org.eclipse.core.runtime.IExtensionRegistry"
+	@Option(example =
+			"org.eclipse.core.runtime.IExtensionPoint, " +
+			"org.eclipse.core.runtime.IExtensionRegistry"
 			, displayName = "Target Type", description = "Fully qualified class name to inline")
 	String targetType;
 

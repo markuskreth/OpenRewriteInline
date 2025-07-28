@@ -2,7 +2,9 @@ package de.kreth.openrewrite.inline.variables;
 
 import static org.openrewrite.java.Assertions.java;
 
+
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -24,13 +26,14 @@ class InlineRegistryPointExtensionTest implements RewriteTest {
                 ));
     }
 
-    @Test
-    void inlineRegistryAndExtensionPoints() {
+	@DocumentExample
+	@Test
+	void inlineRegistryAndExtensionPoints() {
 
         rewriteRun(
 		  spec -> spec.cycles(3),
           java(
-            """
+				"""
             import org.eclipse.core.runtime.*;
 
             public class ExtensionReader {
@@ -57,7 +60,7 @@ class InlineRegistryPointExtensionTest implements RewriteTest {
                 }
             }
             """,
-            """
+				"""
             import org.eclipse.core.runtime.*;
 
             public class ExtensionReader {

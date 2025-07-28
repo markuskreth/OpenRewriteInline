@@ -4,17 +4,18 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
+
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.J.ArrayAccess;
 import org.openrewrite.java.tree.J.ArrayDimension;
 import org.openrewrite.java.tree.J.Identifier;
 import org.openrewrite.java.tree.J.VariableDeclarations;
 import org.openrewrite.java.tree.J.VariableDeclarations.NamedVariable;
+import org.openrewrite.java.tree.JavaType;
 
 public class FindArrayAccesses extends JavaIsoVisitor<ExecutionContext> {
 
@@ -27,13 +28,13 @@ public class FindArrayAccesses extends JavaIsoVisitor<ExecutionContext> {
 				.reduce(inBlock, new AtomicReference<>());
 		return Optional.ofNullable(ref.get());
 	}
-	
+
 	static class ArrayAccessElementVariableVisitor extends JavaIsoVisitor<AtomicReference<J.VariableDeclarations.NamedVariable>> {
 
 		private final String className;
 		private final String indexVariableName;
 		private final Identifier arrayName;
-		
+
 		public ArrayAccessElementVariableVisitor(String className, String indexVariableName, Identifier arrayName) {
 			super();
 			this.className = className;

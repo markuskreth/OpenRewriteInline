@@ -1,16 +1,11 @@
 package de.kreth.openrewrite.loops;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Incubating;
-import org.openrewrite.NlsRewrite.Description;
-import org.openrewrite.NlsRewrite.DisplayName;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.Tree;
@@ -18,15 +13,8 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.J.AssignmentOperation;
-import org.openrewrite.java.tree.J.Binary;
-import org.openrewrite.java.tree.J.Block;
-import org.openrewrite.java.tree.J.FieldAccess;
-import org.openrewrite.java.tree.J.ForEachLoop;
-import org.openrewrite.java.tree.J.ForLoop;
+import org.openrewrite.java.tree.J.*;
 import org.openrewrite.java.tree.J.ForLoop.Control;
-import org.openrewrite.java.tree.J.Identifier;
-import org.openrewrite.java.tree.J.VariableDeclarations;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.JavaType.Variable;
@@ -43,27 +31,27 @@ import lombok.NoArgsConstructor;
 import lombok.With;
 
 @Incubating(since = "1.0.0")
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 @AllArgsConstructor(access = AccessLevel.PACKAGE)
 @NoArgsConstructor
 public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 
 	private static final String MARKER_TEXT = "This makes conversion to foreach loop impossible.";
-	
+
 	@Option(
-			displayName = "Verarbeiteter Array Typ", 
-			description = "Nur Schleifen über Arrays dieses Typ wird die Schleife umgewandelt", 
+			displayName = "Verarbeiteter Array Typ",
+			description = "Nur Schleifen über Arrays dieses Typ wird die Schleife umgewandelt",
 			example = "\"org.eclipse.core.runtime.IExtension\"")
 	@With
 	private String className;
 
 	@Override
-	public @DisplayName String getDisplayName() {
+	public String getDisplayName() {
 		return "Convert IExtension to foreach";
 	}
 
 	@Override
-	public @Description String getDescription() {
+	public String getDescription() {
 		return "Convert for loops to foreach loops for IExtension array only.";
 	}
 
@@ -75,10 +63,9 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 	class ConvertIExtensionForToForeachLoopVisitor extends JavaIsoVisitor<ExecutionContext> {
 
 		private Identifier arrayIdentifier;
-		private final List<Block> illegalBlocks = new ArrayList<>();
-		
+
 		public Optional<Control> hasIllegalControl(Control c, String arrayName) {
-			
+
 			if (isIteratingOverArray(c.getCondition(), arrayName)) {
 				List<Statement> update = c.getUpdate();
 				if (update.size() > 1) {
@@ -96,9 +83,6 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 									return Optional.of(c.withUpdate(Arrays.asList(SearchResult.found(assOp, MARKER_TEXT))));
 								}
 							}
-						}
-						if (!assOp.getOperator().equals(AssignmentOperation.Type.Addition)) {
-							return Optional.of(c.withUpdate(Arrays.asList(SearchResult.found(assOp, MARKER_TEXT))));
 						}
 					}
 				}
@@ -120,8 +104,8 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 		}
 
 		@Override
-		public ForLoop visitForLoop(ForLoop forLoop, ExecutionContext p) {
-			ForLoop visitForLoop = super.visitForLoop(forLoop, p);
+		public ForLoop visitForLoop(ForLoop forLoop, ExecutionContext ctx) {
+			ForLoop visitForLoop = super.visitForLoop(forLoop, ctx);
 
 			// Step 1: validate Index variable
 			Optional<VariableDeclarations> indexVariable = getIndexVariable(forLoop);
@@ -129,7 +113,7 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 				return visitForLoop;
 			}
 			VariableDeclarations initVar = indexVariable.get();
-			
+
 			J.VariableDeclarations.NamedVariable indexVar = initVar.getVariables().get(0);
 			String indexVariableName = indexVar.getSimpleName();
 
@@ -140,8 +124,8 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 			}
 
 			// Step 3: body without statements
-			if (!(forLoop.getBody() instanceof J.Block forBody) 
-					|| forBody.getStatements().isEmpty()) {
+			if (!(forLoop.getBody() instanceof J.Block forBody) ||
+					forBody.getStatements().isEmpty()) {
 				return visitForLoop;
 			}
 
@@ -149,23 +133,19 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 
 			Optional<Control> hc = hasIllegalControl(visitForLoop.getControl(), arrayIdentifier.toString());
 			if (hc.isPresent()) {
-				
-				if (forLoop.getBody() instanceof Block body) {
-					illegalBlocks.add(body);
+
+				if (forLoop.getBody() instanceof Block) {
 					return visitForLoop.withControl(hc.get());
 				}
 			}
-			
+
 			return visitForLoop;
 		}
-		
+
 		@Override
 		public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
 			block = super.visitBlock(block, ctx);
 
-			if (illegalBlocks.contains(block)) {
-				return block;
-			}
 			List<Statement> statements = block.getStatements();
 			for (int i = 0; i < statements.size(); i++) {
 				Statement stmt = statements.get(i);
@@ -178,7 +158,7 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 					continue;
 				}
 				VariableDeclarations initVar = indexVariable.get();
-				
+
 				J.VariableDeclarations.NamedVariable indexVar = initVar.getVariables().get(0);
 				String indexVariableName = indexVar.getSimpleName();
 
@@ -187,10 +167,10 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 				if (arrayId.isEmpty()) {
 					continue;
 				}
-				
+
 				// Step 3: body without statements
-				if (!(forLoop.getBody() instanceof J.Block forBody) 
-						|| forBody.getStatements().isEmpty()) {
+				if (!(forLoop.getBody() instanceof J.Block forBody) ||
+						forBody.getStatements().isEmpty()) {
 					continue;
 				}
 
@@ -240,10 +220,10 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 				}
 				JRightPadded<VariableDeclarations> variable = createNewLoopVariable(name);
 				JRightPadded<Expression> iterable = JRightPadded.build(arrayIdentifier);
-				
+
 				J.Block newBody = ReplaceArrayVariableAccess
 						.replaceArrayVariableAccessVisitor(forBody, className, indexVariableName, arrayIdentifier, name, ctx);
-				
+
 				JRightPadded<Statement> body = JRightPadded.build((Statement)newBody)
 						.withAfter(Space.EMPTY)
 						.withMarkers(Markers.EMPTY);
@@ -261,14 +241,14 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 		private List<Statement> replaceForStatement(List<Statement> statements, int i, J.ForEachLoop foreach) {
 			List<Statement> statementsBeforeLoop = statements.subList(0, i);
 			List<Statement> statementsAfterLoop = statements.subList(i + 1, statements.size());
-			
+
 			List<Statement> newStatements = new ArrayList<>();
 			newStatements.addAll(statementsBeforeLoop);
 			newStatements.add(foreach);
 			newStatements.addAll(statementsAfterLoop);
 			return newStatements;
 		}
-		
+
 		private ForEachLoop createNewForEachLoop(ForLoop forLoop, JRightPadded<VariableDeclarations> variable,
 				JRightPadded<Expression> iterable, JRightPadded<Statement> body) {
 			J.ForEachLoop.Control loopControll = new J.ForEachLoop.Control(Tree.randomId(), Space.SINGLE_SPACE,
@@ -276,7 +256,7 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 			return new J.ForEachLoop(Tree.randomId(), forLoop.getPrefix(), forLoop.getMarkers(),
 					loopControll, body);
 		}
-		
+
 		private JRightPadded<VariableDeclarations> createNewLoopVariable(J.Identifier varId) {
 
 			VariableDeclarations.NamedVariable var = new VariableDeclarations.NamedVariable(Tree.randomId(),
@@ -285,7 +265,7 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 			VariableDeclarations varDec = createLoopVariable(var);
 			return JRightPadded.build(varDec.withType(JavaType.buildType(className))).withAfter(Space.SINGLE_SPACE);
 		}
-		
+
 		private VariableDeclarations createLoopVariable(VariableDeclarations.NamedVariable var) {
 
 			String simpleClassName = getSimpleClassName();
@@ -298,13 +278,12 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 		}
 
 		private String getSimpleClassName() {
-			String simpleClassName = className.substring(className.lastIndexOf('.') + 1);
-			return simpleClassName;
+			return className.substring(className.lastIndexOf('.') + 1);
 		}
-		
+
 		private Optional<J.VariableDeclarations> getIndexVariable(J.ForLoop forLoop) {
-			if (forLoop.getControl().getInit().size() == 1
-					&& forLoop.getControl().getInit().get(0) instanceof J.VariableDeclarations initVar) {
+			if (forLoop.getControl().getInit().size() == 1 &&
+					forLoop.getControl().getInit().get(0) instanceof J.VariableDeclarations initVar) {
 				return Optional.of(initVar);
 			}
 			return Optional.empty();
@@ -313,7 +292,7 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 		private Optional<J.Identifier> getRightFieldIdentifierSimpleName(ForLoop forLoop, String indexName) {
 
 			Expression condition = forLoop.getControl().getCondition();
-			if (!(condition instanceof J.Binary binary) || !binary.getOperator().equals(J.Binary.Type.LessThan)) {
+			if (!(condition instanceof J.Binary binary) || binary.getOperator() != J.Binary.Type.LessThan) {
 				return Optional.empty();
 			}
 
@@ -335,5 +314,5 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 	static <T extends J> T found(T argId) {
 		return SearchResult.found(argId, MARKER_TEXT);
 	}
-	
+
 }

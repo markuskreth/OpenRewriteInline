@@ -1,31 +1,17 @@
 package de.kreth.openrewrite.loops;
 
-import org.openrewrite.NlsRewrite.Description;
-import org.openrewrite.NlsRewrite.DisplayName;
-import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
-import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.J.ArrayAccess;
-import org.openrewrite.java.tree.J.ArrayDimension;
-import org.openrewrite.java.tree.J.Binary;
-import org.openrewrite.java.tree.J.Block;
-import org.openrewrite.java.tree.J.FieldAccess;
-import org.openrewrite.java.tree.J.ForLoop;
-import org.openrewrite.java.tree.J.Identifier;
-import org.openrewrite.java.tree.J.VariableDeclarations;
+import org.openrewrite.java.tree.J.*;
 import org.openrewrite.java.tree.J.VariableDeclarations.NamedVariable;
 import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.JavaType.FullyQualified;
-import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
-import org.openrewrite.marker.Markers;
 
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
@@ -41,26 +27,26 @@ public class ConvertIExtensionForToForeachLoopRecipe_old extends Recipe {
             example = "\"org.eclipse.core.runtime.IExtension\"")
 	@With
 	private String className;
-	
+
 	@Override
-	public @DisplayName String getDisplayName() {
+	public String getDisplayName() {
 		return "Convert IExtension to foreach";
 	}
 
 	@Override
-	public @Description String getDescription() {
+	public String getDescription() {
 		return "Convert for loops to foreach loops for IExtension array only.";
 	}
-	
+
 	@Override
 	public TreeVisitor<?, ExecutionContext> getVisitor() {
 		return new ConvertIExtensionForToForeachLoopVisitor();
 	}
-	
+
 	class ConvertIExtensionForToForeachLoopVisitor extends JavaIsoVisitor<ExecutionContext> {
 		@Override
-		public ForLoop visitForLoop(ForLoop l, ExecutionContext p) {
-			ForLoop forLoop = super.visitForLoop(l, p);
+		public ForLoop visitForLoop(ForLoop l, ExecutionContext ctx) {
+			ForLoop forLoop = super.visitForLoop(l, ctx);
 			ForLoop.Control control = forLoop.getControl();
             if (control.getInit().size() != 1 || !(control.getInit().get(0) instanceof VariableDeclarations initVar)) {
                 return forLoop;
@@ -72,7 +58,7 @@ public class ConvertIExtensionForToForeachLoopRecipe_old extends Recipe {
 
             // Abbruchbedingung: i < array.length
             if (!(control.getCondition() instanceof Binary cond) ||
-                !cond.getOperator().equals(Binary.Type.LessThan) ||
+                cond.getOperator() != Binary.Type.LessThan ||
                 !(cond.getLeft() instanceof Identifier id) ||
                 !id.getSimpleName().equals(indexName) ||
                 !(cond.getRight() instanceof FieldAccess lengthAccess) ||
@@ -100,7 +86,7 @@ public class ConvertIExtensionForToForeachLoopRecipe_old extends Recipe {
 
             Expression indexedExpr = access.getIndexed();
             ArrayDimension indexExpr = access.getDimension();
-            
+
             if (!(indexedExpr instanceof J.Identifier accessArray) || !accessArray.getSimpleName().equals(arrayName)) {
 				return forLoop;
 			}
@@ -139,6 +125,6 @@ public class ConvertIExtensionForToForeachLoopRecipe_old extends Recipe {
 
             return forLoop;
         }
-		
+
 	}
 }
