@@ -115,53 +115,7 @@ class ConvertForToForeachLoopTest implements RewriteTest {
                 """
                 ));
     }
-//
-//    4. Modifikation des Arrays während der Iteration
-// // Index-Schleife
-//    for (int i = 0; i < array.length; i++) {
-//        array[i] = array[i] * 2; // Werte ändern
-//    }
-//
-//    // Foreach-Variable ist read-only
-//    for (int value : array) {
-//        value = value * 2; // Ändert NICHT das Array!
-//    }
-//    
-//    5. Vorzeitiges Beenden mit Index-Information
-// // Index-Schleife
-//    int foundIndex = -1;
-//    for (int i = 0; i < array.length; i++) {
-//        if (array[i] == searchValue) {
-//            foundIndex = i;
-//            break;
-//        }
-//    }
-//
-//    // Foreach kann Index nicht liefern
-//    6. Parallele Iteration über mehrere Arrays
-// // Index-Schleife
-//    for (int i = 0; i < array1.length; i++) {
-//        System.out.println(array1[i] + " " + array2[i]);
-//    }
-//
-//    // Foreach kann nur über ein Array iterieren
-//    
-//    7. Bedingte Iteration (Start/Ende abhängig von Bedingungen)
-// // Index-Schleife
-//    for (int i = startIndex; i < endIndex; i++) {
-//        process(array[i]);
-//    }
-//
-//    // Foreach startet immer bei Index 0 und geht bis zum Ende
-//    8. Berechnete Indizes oder komplexe Zugriffsmuster
-// // Index-Schleife
-//    for (int i = 0; i < array.length; i++) {
-//        int index = (i * 2) % array.length;
-//        System.out.println(array[index]);
-//    }
-//
-//    // Foreach kann nur sequenziell zugreifen
-
+    
     @Test
     void dontReplaceForLoopWithIndexVarUsage() {
         rewriteRun(
@@ -242,6 +196,49 @@ class ConvertForToForeachLoopTest implements RewriteTest {
                                     IConfigurationElement[] elements = extension.getConfigurationElements();
                                     for (int j = 1; j < elements.length; j++) {
                                         System.out.println(elements/*~~(This makes conversion to foreach loop impossible.)~~>*/[j-1].getName());
+                                    }
+                                }
+                            }
+                        }
+                        """
+                ));
+    }
+
+    @Test
+    void dontReplaceForLoopWithWithArrayAccessSideEffect2() {
+        rewriteRun(
+        		spec ->
+        			spec.recipe(new ConvertIExtensionForToForeachLoopRecipe()
+            				.withClassName("org.eclipse.core.runtime.IConfigurationElement"))
+        		,
+                java(
+				"""
+                        import org.eclipse.core.runtime.IExtension;
+                        import org.eclipse.core.runtime.IConfigurationElement;
+
+                        public class ExtensionArrayLoop {
+                            public void loop(IExtension[] extensions) {
+                                for (int i = 0; i < extensions.length; i++) {
+                                    IExtension extension = extensions[i];
+                                    IConfigurationElement[] elements = extension.getConfigurationElements();
+                                    for (int j = 1; j < elements.length; j++) {
+                                        System.out.println(elements[1 + j].getName());
+                                    }
+                                }
+                            }
+                        }
+                        """,
+				"""
+                        import org.eclipse.core.runtime.IExtension;
+                        import org.eclipse.core.runtime.IConfigurationElement;
+
+                        public class ExtensionArrayLoop {
+                            public void loop(IExtension[] extensions) {
+                                for (int i = 0; i < extensions.length; i++) {
+                                    IExtension extension = extensions[i];
+                                    IConfigurationElement[] elements = extension.getConfigurationElements();
+                                    for (int j = 1; j < elements.length; j++) {
+                                        System.out.println(elements/*~~(This makes conversion to foreach loop impossible.)~~>*/[1 + j].getName());
                                     }
                                 }
                             }
@@ -421,77 +418,113 @@ class ConvertForToForeachLoopTest implements RewriteTest {
     @Test
     void dontReplaceForLoopWithWithWrongIndexVar() {
         rewriteRun(
-        		spec ->
-        			spec.recipe(new ConvertIExtensionForToForeachLoopRecipe()
-            				.withClassName("org.eclipse.core.runtime.IConfigurationElement"))
-        		,
-                java(
-				"""
-                        import org.eclipse.core.runtime.IExtension;
-                        import org.eclipse.core.runtime.IConfigurationElement;
+    		spec ->
+    			spec.recipe(new ConvertIExtensionForToForeachLoopRecipe()
+        				.withClassName("org.eclipse.core.runtime.IConfigurationElement"))
+    		,
+            java(
+        		"""
+                import org.eclipse.core.runtime.IExtension;
+                import org.eclipse.core.runtime.IConfigurationElement;
 
-                        public class ExtensionArrayLoop {
-                            public void loop(IExtension[] extensions) {
-                                for (int i = 0; i < extensions.length; i++) {
-                                    IExtension extension = extensions[i];
-                                    IConfigurationElement[] elements = extension.getConfigurationElements();
-                                    for (int j = 1; j < elements.length; j++) {
-                                        System.out.println(elements[i].getName());
-                                        System.out.println(elements[j].getName());
-                                    }
-                                }
+                public class ExtensionArrayLoop {
+                    public void loop(IExtension[] extensions) {
+                        for (int i = 0; i < extensions.length; i++) {
+                            IExtension extension = extensions[i];
+                            IConfigurationElement[] elements = extension.getConfigurationElements();
+                            for (int j = 1; j < elements.length; j++) {
+                                System.out.println(elements[i].getName());
+                                System.out.println(elements[j].getName());
                             }
                         }
-                        """,
-				"""
-                        import org.eclipse.core.runtime.IExtension;
-                        import org.eclipse.core.runtime.IConfigurationElement;
+                    }
+                }
+                """,
+            	"""
+                import org.eclipse.core.runtime.IExtension;
+                import org.eclipse.core.runtime.IConfigurationElement;
 
-                        public class ExtensionArrayLoop {
-                            public void loop(IExtension[] extensions) {
-                                for (int i = 0; i < extensions.length; i++) {
-                                    IExtension extension = extensions[i];
-                                    IConfigurationElement[] elements = extension.getConfigurationElements();
-                                    for (IConfigurationElement iConfigurationElement : elements) {
-                                        System.out.println(elements[i].getName());
-                                        System.out.println(iConfigurationElement.getName());
-                                    }
-                                }
+                public class ExtensionArrayLoop {
+                    public void loop(IExtension[] extensions) {
+                        for (int i = 0; i < extensions.length; i++) {
+                            IExtension extension = extensions[i];
+                            IConfigurationElement[] elements = extension.getConfigurationElements();
+                            for (IConfigurationElement iConfigurationElement : elements) {
+                                System.out.println(elements[i].getName());
+                                System.out.println(iConfigurationElement.getName());
                             }
                         }
-                        """
-                ));
+                    }
+                }
+                """
+            )
+        );
     }
 
     @Test
     void doReplaceForOverStringArray() {
 		rewriteRun(
-        		spec -> spec.recipes(
-        				new ConvertIExtensionForToForeachLoopRecipe()
-        				.withClassName("java.lang.String")),
-				java(
-				"""
-						public class StringArrayLoop {
-					    public void loop() {
-					        String[] strings = {"one", "two", "three"};
-					        for (int i = 0; i < strings.length; i++) {
-						        String str = strings[i]; 
-					            System.out.println(str);
-					        }
-					    }
-					}
-					""",
-				"""
-					public class StringArrayLoop {
-				    public void loop() {
-				        String[] strings = {"one", "two", "three"};
-				        for (String str : strings) { 
-				            System.out.println(str);
-				        }
-				    }
-				}
-				"""
-				));
+    		spec -> spec.recipes(
+    				new ConvertIExtensionForToForeachLoopRecipe()
+    				.withClassName("java.lang.String")),
+			java(
+			"""
+			public class StringArrayLoop
+			{
+			    public void loop()
+			    {
+			        String[] strings = {"one", "two", "three"};
+			        for (int i = 0; i < strings.length; i++) {
+				        String str = strings[i]; 
+			            System.out.println(str);
+			        }
+			    }
+			}
+			""",
+			"""
+			public class StringArrayLoop
+			{
+			    public void loop()
+			    {
+			        String[] strings = {"one", "two", "three"};
+			        for (String str : strings) { 
+			            System.out.println(str);
+			        }
+			    }
+			}
+			"""
+			));
+    }
+
+    @Test
+    void doReplaceForAlternativeArrayAccess() {
+		rewriteRun(
+    		spec -> spec.recipes(
+    				new ConvertIExtensionForToForeachLoopRecipe()
+    				.withClassName("java.lang.String")),
+			java(
+			"""
+				public class StringArrayLoop {
+			    public void loop() {
+			        String[] strings = {"one", "two", "three"};
+			        for (int i = 0; i < strings.length; i++) {
+				        String str = strings[ i ]; 
+			            System.out.println(str + strings[ 0 ]);
+			        }
+			    }
+			}
+			""", """
+				public class StringArrayLoop {
+			    public void loop() {
+			        String[] strings = {"one", "two", "three"};
+			        for (String str : strings) {
+			            System.out.println(str + strings[ 0 ]);
+			        }
+			    }
+			}
+			"""
+			)
+		);
     }
 
     @Test
@@ -537,19 +570,19 @@ class ConvertForToForeachLoopTest implements RewriteTest {
         				.withClassName("java.lang.String")),
 				java(
 				"""
-						public class StringArrayLoop {
-					    public void loop() {
-					        String[] strings = {"one", "two", "three"};
-					        for (int i = 0; i < strings.length; i++) {
-					            System.out.println(strings[i]);
-					            System.out.println(strings[i].length());
-					            System.out.println(strings[i].isBlank());
-					        }
-					    }
-					}
-					""",
+				public class StringArrayLoop {
+				    public void loop() {
+				        String[] strings = {"one", "two", "three"};
+				        for (int i = 0; i < strings.length; i++) {
+				            System.out.println(strings[i]);
+				            System.out.println(strings[i].length());
+				            System.out.println(strings[i].isBlank());
+				        }
+				    }
+				}
+				""",
 				"""
-					public class StringArrayLoop {
+				public class StringArrayLoop {
 				    public void loop() {
 				        String[] strings = {"one", "two", "three"};
 				        for (String string : strings) {

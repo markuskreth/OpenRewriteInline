@@ -21,11 +21,11 @@ public final class IllegalArrayVariableAccess {
 			J.Block inBlock, final String arrayIndexVariableName,
 			final Identifier arrayName) {
 
-		AtomicReference<Boolean> hasChanges = new AtomicReference<>();
+		AtomicReference<Boolean> hasChanges = new AtomicReference<>(Boolean.FALSE);
 		Block result = new ReplaceArrayVariableAccessVisitor(arrayIndexVariableName, arrayName)
 				.visitBlock(inBlock, hasChanges);
 
-		if (hasChanges.get() != null && hasChanges.get().booleanValue()) {
+		if (hasChanges.get().booleanValue()) {
 			return Optional.of(result);
 		}
 		return Optional.empty();
@@ -55,29 +55,11 @@ public final class IllegalArrayVariableAccess {
 			}
 			// Check if Array Access index equals index variable Name only.
 			ArrayDimension dimension = visitArrayAccess.getDimension();
-//			if (!(dimension.getIndex() instanceof J.Identifier dimId) 
-//					|| !dimId.getSimpleName().equals(indexVariableName)) {
-//				// Other than simple index variable.
-//				p.set(true);
-//				visitArrayAccess = visitArrayAccess.withDimension(SearchResult.found(dimension, MARKER_TEXT));
-//			}
 
 			Expression index = dimension.getIndex();
-			if (!(index instanceof Identifier)) {
-				if (index instanceof Binary bin) {
-					if (bin.getLeft() instanceof Identifier left) {
-						if (left.getSimpleName().equals(indexVariableName)) {
-							visitArrayAccess = visitArrayAccess.withDimension(SearchResult.found(dimension, MARKER_TEXT));
-							p.set(true);
-						}
-					}
-					if (bin.getRight() instanceof Identifier right) {
-						if (right.getSimpleName().equals(indexVariableName)) {
-							visitArrayAccess = visitArrayAccess.withDimension(SearchResult.found(dimension, MARKER_TEXT));
-							p.set(true);
-						}
-					}
-				}
+			if (!(index instanceof Identifier || index instanceof Literal)) {
+				visitArrayAccess = visitArrayAccess.withDimension(SearchResult.found(dimension, MARKER_TEXT));
+				p.set(true);
 			}
 			return visitArrayAccess;
 		}
