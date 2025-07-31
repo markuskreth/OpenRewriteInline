@@ -13,7 +13,7 @@ public class VariableInfo {
     private final J.VariableDeclarations.NamedVariable variable;
     final J.MethodInvocation initialization;
     final J.VariableDeclarations declaration;
-    int usageCount = 0;
+    int usageCount;
 
     VariableInfo(String variableName, J.VariableDeclarations.NamedVariable variable,
                 J.MethodInvocation initialization,
@@ -35,14 +35,14 @@ public class VariableInfo {
 
 	public boolean isMatch(Expression expression) {
 		if (expression instanceof J.Identifier ident) {
-			return variableName.equals(ident.getSimpleName()) &&
-					variable.getType().equals(ident.getType());
+			return variableName.equals(ident.getSimpleName())
+					&& variable.getType().equals(ident.getType());
 		}
 		return false;
 	}
 
 	public boolean isMatch(NamedVariable namedVariable) {
-		return this.variableName.equals(namedVariable.getSimpleName()) &&
-				variable.getType().equals(namedVariable.getType());
+		return this.variableName.equals(namedVariable.getSimpleName())
+				&& variable.getType().equals(namedVariable.getType());
 	}
 }

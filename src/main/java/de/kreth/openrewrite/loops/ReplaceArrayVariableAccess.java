@@ -15,7 +15,7 @@ import org.openrewrite.java.tree.J.VariableDeclarations;
 import org.openrewrite.java.tree.J.VariableDeclarations.NamedVariable;
 import org.openrewrite.java.tree.JavaType;
 
-public class ReplaceArrayVariableAccess {
+public final class ReplaceArrayVariableAccess {
 
 	private ReplaceArrayVariableAccess() {
 	}
@@ -59,7 +59,7 @@ public class ReplaceArrayVariableAccess {
 		@Override
 		public @Nullable VariableDeclarations visitVariableDeclarations(VariableDeclarations multiVariable, ExecutionContext p) {
 			VariableDeclarations variableDeclarations = super.visitVariableDeclarations(multiVariable, p);
-			NamedVariable namedVariable = variableDeclarations.getVariables().get(0);
+			NamedVariable namedVariable = variableDeclarations.getVariables().getFirst();
 			if (namedVariable.getName().equals(replacement)) {
 				return null;
 			}
@@ -71,8 +71,8 @@ public class ReplaceArrayVariableAccess {
 
 				@Nullable
 				JavaType arrayType = arrayAccess.getType();
-				if (arrayType == null ||
-						!arrayType.toString().equals(arrayVariableType)) {
+				if (arrayType == null
+						|| !arrayType.toString().equals(arrayVariableType)) {
 					return select;
 				}
 				Expression indexed = arrayAccess.getIndexed();

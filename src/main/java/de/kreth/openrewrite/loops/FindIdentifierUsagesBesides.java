@@ -38,7 +38,7 @@ public class FindIdentifierUsagesBesides {
 			Statement visitStatement = super.visitStatement(statement, p);
 			if (visitStatement instanceof MethodInvocation mi) {
 				List<Expression> arguments = mi.getArguments();
-				for (int i=0; i<arguments.size(); i++) {
+				for (int i = 0; i < arguments.size(); i++) {
 					Expression expression = arguments.get(i);
 					if (expression instanceof Identifier argId) {
 						if (argId.equals(var)) {
@@ -106,5 +106,8 @@ public class FindIdentifierUsagesBesides {
 			}
 			return equals;
 		}
+	}
+
+	private FindIdentifierUsagesBesides() {
 	}
 }

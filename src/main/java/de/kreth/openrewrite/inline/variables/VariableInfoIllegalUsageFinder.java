@@ -10,11 +10,11 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.J.If;
 import org.openrewrite.java.tree.J.MethodInvocation;
 
-public class VariableInfoIllegalUsageFinder extends JavaIsoVisitor<List<VariableUsage>> {
+public final class VariableInfoIllegalUsageFinder extends JavaIsoVisitor<List<VariableUsage>> {
 
 	private final VariableInfo variableInfo;
 
-	public static List<VariableUsage> findIllegalUsages(J.Block block,  VariableInfo variableInfo) {
+	public static List<VariableUsage> findIllegalUsages(J.Block block, VariableInfo variableInfo) {
 		VariableInfoIllegalUsageFinder finder = new VariableInfoIllegalUsageFinder(variableInfo);
 		return finder.reduce(block, new ArrayList<>());
 	}

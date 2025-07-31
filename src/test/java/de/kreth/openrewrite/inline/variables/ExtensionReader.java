@@ -7,7 +7,7 @@ public class ExtensionReader {
         IExtensionRegistry registry = Platform.getExtensionRegistry();
         IExtensionPoint point1 = registry.getExtensionPoint("ext1");
         IExtension[] extensions1 = point1.getExtensions();
-        for (int i=0; i < extensions1.length; i++) {
+        for (int i = 0; i < extensions1.length; i++) {
         	IExtension ext = extensions1[i];
             IConfigurationElement[] configs = ext.getConfigurationElements();
             for (int j = 0; j < configs.length; j++) {

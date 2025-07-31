@@ -28,8 +28,8 @@ public class InlineVariablesByTypeRecipe extends Recipe {
 
 	@With
 	@Option(example =
-			"org.eclipse.core.runtime.IExtensionPoint, " +
-			"org.eclipse.core.runtime.IExtensionRegistry"
+			"org.eclipse.core.runtime.IExtensionPoint, "
+			+ "org.eclipse.core.runtime.IExtensionRegistry"
 			, displayName = "Target Type", description = "Fully qualified class name to inline")
 	String targetType;
 
@@ -107,8 +107,7 @@ public class InlineVariablesByTypeRecipe extends Recipe {
 				AtomicReference<VariableInfo> inlineableVars, ExecutionContext ctx) {
 
 			// Exakte Typprüfung über OpenRewrite's Typsystem
-			if (!targetTypeMatcher.matches(varDecl.getType())) {
-				return; // Nicht der erwartete Typ
+			if (!targetTypeMatcher.matches(varDecl.getType())) { // Nicht der erwartete Typ
 			} else {
 				for (J.VariableDeclarations.NamedVariable var : varDecl.getVariables()) {
 					Expression initializer = var.getInitializer();
@@ -189,8 +188,8 @@ public class InlineVariablesByTypeRecipe extends Recipe {
 				if (namedVariable.getInitializer() instanceof J.MethodInvocation mi) {
 
 					// Prüfe ob es der Factory-Methode entspricht
-					if (targetTypeMatcher.matches(mi.getType()) &&
-							factoryMethodName.equals(mi.getSimpleName())) {
+					if (targetTypeMatcher.matches(mi.getType())
+							&& factoryMethodName.equals(mi.getSimpleName())) {
 						if (inlineableVars.isMatch(namedVariable)) {
 							return null; // Wenn ja, diese Zeile entfernen.
 						} else {
@@ -203,10 +202,10 @@ public class InlineVariablesByTypeRecipe extends Recipe {
 
 							@Nullable
 							Expression select = methodInvocation.getSelect();
-							if (targetTypeMatcher.matches(select.getType()) &&
-									(select instanceof J.MethodInvocation creationMethod) &&
-									targetTypeMatcher.matches(creationMethod.getType()) &&
-									factoryMethodName.equals(creationMethod.getSimpleName())) {
+							if (targetTypeMatcher.matches(select.getType())
+									&& (select instanceof J.MethodInvocation creationMethod)
+									&& targetTypeMatcher.matches(creationMethod.getType())
+									&& factoryMethodName.equals(creationMethod.getSimpleName())) {
 
 								List<Comment> commentsOld = new ArrayList<>(inlineableVars.declaration.getComments());
 								List<Comment> comments = new ArrayList<>(commentsOld);

@@ -49,9 +49,9 @@
 			<artifactId>rewrite-templating</artifactId>
 		</dependency>
 		<dependency>
-			<groupId>javax.annotation</groupId>
-			<artifactId>javax.annotation-api</artifactId>
-			<version>1.3.2</version>
+			<groupId>jakarta.annotation</groupId>
+			<artifactId>jakarta.annotation-api</artifactId>
+			<version>1.3.5</version>
 		</dependency>
 		<dependency>
 			<groupId>jakarta.annotation</groupId>
@@ -153,10 +153,8 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
-				<version>3.13.0</version>
+				<version>3.14.0</version>
 				<configuration>
-					<source>${maven.compiler.source}</source>
-					<target>${maven.compiler.target}</target>
 					<testSource>${maven.compiler.source}</testSource>
 					<testTarget>${maven.compiler.target}</testTarget>
 					<compilerArgs>
@@ -174,6 +172,7 @@
 							<version>1.26.0</version>
 						</path>
 					</annotationProcessorPaths>
+					<release>21</release>
 				</configuration>
 			</plugin>
 			<plugin>
@@ -208,7 +207,11 @@
 				<configuration>
 					<failOnDryRunResults>true</failOnDryRunResults>
 			        <activeRecipes>
-			            <activeRecipe>org.openrewrite.recipes.rewrite.OpenRewriteRecipeBestPractices</activeRecipe>
+		          		<recipe>org.openrewrite.java.migrate.UpgradeToJava21</recipe>
+			            <recipe>org.openrewrite.staticanalysis.JavaApiBestPractices</recipe>
+			            <recipe>org.openrewrite.staticanalysis.CommonStaticAnalysis</recipe>
+			            <recipe>org.openrewrite.staticanalysis.CodeCleanup</recipe>
+<!--			            <recipe>org.openrewrite.recipes.rewrite.OpenRewriteRecipeBestPractices</recipe>-->
 			        </activeRecipes>
 				</configuration>
 				<dependencies>

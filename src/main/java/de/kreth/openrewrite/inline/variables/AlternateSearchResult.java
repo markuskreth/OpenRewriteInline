@@ -2,7 +2,7 @@ package de.kreth.openrewrite.inline.variables;
 
 import java.util.Objects;
 
-public class AlternateSearchResult<FIRST,SECOND> {
+public final class AlternateSearchResult<FIRST, SECOND> {
 
 	private final FIRST first;
 	private final SECOND second;

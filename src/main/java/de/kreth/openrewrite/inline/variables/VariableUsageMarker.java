@@ -12,7 +12,7 @@ import org.openrewrite.java.tree.J.If;
 import org.openrewrite.java.tree.J.MethodInvocation;
 import org.openrewrite.marker.SearchResult;
 
-public class VariableUsageMarker extends JavaIsoVisitor<List<VariableUsage>> {
+public final class VariableUsageMarker extends JavaIsoVisitor<List<VariableUsage>> {
 
     private final List<VariableUsage> illegalUsages;
 
@@ -53,8 +53,8 @@ public class VariableUsageMarker extends JavaIsoVisitor<List<VariableUsage>> {
 
         if (matchingUsage.isPresent()) {
             // Markiere den Methodenaufruf mit SearchResult
-            String description = "Illegal variable usage in method parameter: " +
-                               matchingUsage.get().getVariableInfo().getSimpleName();
+            String description = "Illegal variable usage in method parameter: "
+                               + matchingUsage.get().getVariableInfo().getSimpleName();
             visitedMethod = SearchResult.found(visitedMethod, description);
         }
 

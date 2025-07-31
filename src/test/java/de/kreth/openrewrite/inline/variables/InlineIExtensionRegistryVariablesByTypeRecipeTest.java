@@ -107,16 +107,18 @@ class InlineIExtensionRegistryVariablesByTypeRecipeTest implements RewriteTest {
                     Platform someComplexMethod() { return null; }
                 }
                 """,
-				"package com.example;\n" +
-						"import org.eclipse.core.runtime.*;\n" +
-						"\n" +
-						"class MyClass {\n" +
-						"    void method() {\n" +
-						"        IExtensionPoint point = someComplexMethod().getExtensionRegistry().getExtensionPoint(\"my.extension\");\n" +
-						"    }\n" +
-						"\n" +
-						"    Platform someComplexMethod() { return null; }\n" +
-						"}"
+				"""
+				package com.example;
+				import org.eclipse.core.runtime.*;
+				
+				class MyClass {
+				    void method() {
+				        IExtensionPoint point = someComplexMethod().getExtensionRegistry().getExtensionPoint("my.extension");
+				    }
+				
+				    Platform someComplexMethod() { return null; }
+				}\
+				"""
             )
         );
     }

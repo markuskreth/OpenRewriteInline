@@ -10,7 +10,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.J.*;
 import org.openrewrite.marker.SearchResult;
 
-public class IllegalArrayVariableAccess {
+public final class IllegalArrayVariableAccess {
 
 	private static final String MARKER_TEXT = "This makes conversion to foreach loop impossible.";
 
@@ -49,8 +49,8 @@ public class IllegalArrayVariableAccess {
 			ArrayAccess visitArrayAccess = super.visitArrayAccess(arrayAccess, p);
 			Expression indexed = arrayAccess.getIndexed();
 			// Check if ArrayAccess targets relevant arrayName.
-			if (!(indexed instanceof J.Identifier indexedId) ||
-					!indexedId.getSimpleName().equals(arrayName.getSimpleName())) {
+			if (!(indexed instanceof J.Identifier indexedId)
+					|| !indexedId.getSimpleName().equals(arrayName.getSimpleName())) {
 				return visitArrayAccess;
 			}
 			// Check if Array Access index equals index variable Name only.

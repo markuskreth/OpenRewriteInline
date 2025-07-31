@@ -17,7 +17,7 @@ import org.openrewrite.java.tree.J.VariableDeclarations;
 import org.openrewrite.java.tree.J.VariableDeclarations.NamedVariable;
 import org.openrewrite.java.tree.JavaType;
 
-public class FindArrayAccesses extends JavaIsoVisitor<ExecutionContext> {
+public final class FindArrayAccesses extends JavaIsoVisitor<ExecutionContext> {
 
 	private FindArrayAccesses() {
 	}
@@ -85,10 +85,7 @@ public class FindArrayAccesses extends JavaIsoVisitor<ExecutionContext> {
 			}
 
 			String actualType = elemClass.getFullyQualifiedName();
-			if (!actualType.equals(className)) {
-				return false;
-			}
-			return true;
+			return actualType.equals(className);
 		}
 	}
 }
