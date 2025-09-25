@@ -61,7 +61,9 @@ class InlineRegistryPointExtensionTest implements RewriteTest {
             }
             """,
 				"""
-            import org.eclipse.core.runtime.*;
+            import org.eclipse.core.runtime.IConfigurationElement;
+            import org.eclipse.core.runtime.IExtension;
+            import org.eclipse.core.runtime.Platform;
 
             public class ExtensionReader {
                 public void read() {

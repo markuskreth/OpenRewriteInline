@@ -5,6 +5,7 @@ import java.util.List;
 
 
 import org.openrewrite.Recipe;
+import org.openrewrite.java.RemoveUnusedImports;
 
 public class InlineExtensionManagerRecipe extends Recipe {
     @Override
@@ -37,9 +38,9 @@ public class InlineExtensionManagerRecipe extends Recipe {
                 new InlineVariablesByTypeRecipe()
                     .withTargetType("org.eclipse.core.runtime.IExtension[]")
                     .withFactoryMethodName("getExtensions")
-//                    ,
-//                // Cleanup
-//                new RemoveUnusedImportsRecipe()
+                    ,
+                // Cleanup
+                new RemoveUnusedImports()
             );
     }
 
