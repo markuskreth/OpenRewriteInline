@@ -218,7 +218,7 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 					statements.set(i, forLoop.withBody(illegalIndexUsages.get()));
 					return block.withStatements(statements);
 				}
-				JRightPadded<VariableDeclarations> variable = createNewLoopVariable(name);
+				JRightPadded<Statement> variable = createNewLoopVariable(name);
 				JRightPadded<Expression> iterable = JRightPadded.build(arrayIdentifier);
 
 				J.Block newBody = ReplaceArrayVariableAccess
@@ -249,21 +249,23 @@ public class ConvertIExtensionForToForeachLoopRecipe extends Recipe {
 			return newStatements;
 		}
 
-		private ForEachLoop createNewForEachLoop(ForLoop forLoop, JRightPadded<VariableDeclarations> variable,
+		private ForEachLoop createNewForEachLoop(ForLoop forLoop, JRightPadded<Statement> variable,
 				JRightPadded<Expression> iterable, JRightPadded<Statement> body) {
+			
 			J.ForEachLoop.Control loopControll = new J.ForEachLoop.Control(Tree.randomId(), Space.SINGLE_SPACE,
 					Markers.EMPTY, variable, iterable);
 			return new J.ForEachLoop(Tree.randomId(), forLoop.getPrefix(), forLoop.getMarkers(),
 					loopControll, body);
 		}
 
-		private JRightPadded<VariableDeclarations> createNewLoopVariable(J.Identifier varId) {
+		private JRightPadded<Statement> createNewLoopVariable(J.Identifier varId) {
 
 			VariableDeclarations.NamedVariable var = new VariableDeclarations.NamedVariable(Tree.randomId(),
 					Space.SINGLE_SPACE, Markers.EMPTY, varId.withId(Tree.randomId()), Collections.emptyList(), null,
 					null);
 			VariableDeclarations varDec = createLoopVariable(var);
-			return JRightPadded.build(varDec.withType(JavaType.buildType(className))).withAfter(Space.SINGLE_SPACE);
+			Statement stm = varDec.withType(JavaType.buildType(className));
+			return JRightPadded.build(stm).withAfter(Space.SINGLE_SPACE);
 		}
 
 		private VariableDeclarations createLoopVariable(VariableDeclarations.NamedVariable var) {
